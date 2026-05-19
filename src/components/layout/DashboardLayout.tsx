@@ -1,38 +1,57 @@
-"use client";
-
-import { useState } from "react";
-import { Sidebar } from "./Sidebar";
-import { Header } from "./Header";
-import { cn } from "@/lib/utils";
+import React, { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
+import Sidebar from './Sidebar';
+import Header from './Header';
+import MobileSidebar from './MobileSidebar';
+import { useUIStore } from '@/stores/uiStore';
+import { clsx } from 'clsx';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
-  breadcrumbs?: { label: string; href?: string }[];
 }
 
-export function DashboardLayout({ children, breadcrumbs }: DashboardLayoutProps) {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+const pageTitles: Record<string, string> = {
+  '/dashboard': 'Dashboard',
+  '/cases': 'Cases',
+  '/clients': 'Clients',
+  '/documents': 'Documents',
+  '/correspondence': 'Correspondence',
+  '/procurement': 'Procurement & Expenses',
+  '/employees': 'Employees',
+  '/calendar': 'Calendar',
+  '/reports': 'Reports',
+  '/settings': 'Settings',
+};
+
+const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
+  const { sidebarOpen, setPageTitle } = useUIStore();
+  const location = useLocation();
+
+  useEffect(() => {
+    // Handle dynamic routes like /cases/:id
+    const basePath = '/' + location.pathname.split('/')[1];
+    const title = pageTitles[basePath] || pageTitles[location.pathname] || 'MAIRA & ADHIS ADVOCATES';
+    setPageTitle(title);
+    document.title = `${title} | MAIRA & ADHIS ADVOCATES`;
+  }, [location.pathname, setPageTitle]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Sidebar
-        collapsed={sidebarCollapsed}
-        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-      />
+    <div className="min-h-screen bg-gray-50 flex">
+      <Sidebar />
+      <MobileSidebar />
       <div
-        className={cn(
-          "transition-all duration-300",
-          sidebarCollapsed ? "pl-16" : "pl-64"
+        className={clsx(
+          'flex-1 flex flex-col min-w-0 transition-all duration-300',
+          sidebarOpen ? 'lg:pl-64' : 'lg:pl-16'
         )}
       >
-        <Header
-          onMenuToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-          breadcrumbs={breadcrumbs}
-        />
-        <main className="pt-16 min-h-screen">
-          <div className="p-6">{children}</div>
+        <Header />
+        <main className="flex-1 p-4 lg:p-6 overflow-auto">
+          {children}
         </main>
       </div>
     </div>
   );
-}
+};
+
+export default DashboardLayout;

@@ -2,25 +2,25 @@ import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { X, Scale, LayoutDashboard, Briefcase, Users, FileText, Mail, ShoppingCart, UserCog, Calendar, BarChart3, Settings, LogOut } from 'lucide-react';
 import { useUIStore } from '@/stores/uiStore';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuthStore } from '@/stores/authStore';
 import { clsx } from 'clsx';
 
 const navItems = [
   { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-  { label: 'Cases', path: '/dashboard/cases', icon: Briefcase },
-  { label: 'Clients', path: '/dashboard/clients', icon: Users },
-  { label: 'Documents', path: '/dashboard/documents', icon: FileText },
-  { label: 'Correspondence', path: '/dashboard/correspondence', icon: Mail },
-  { label: 'Procurement', path: '/dashboard/procurement', icon: ShoppingCart },
-  { label: 'Employees', path: '/dashboard/employees', icon: UserCog },
-  { label: 'Calendar', path: '/dashboard/calendar', icon: Calendar },
-  { label: 'Reports', path: '/dashboard/reports', icon: BarChart3 },
-  { label: 'Settings', path: '/dashboard/settings', icon: Settings },
+  { label: 'Cases', path: '/cases', icon: Briefcase },
+  { label: 'Clients', path: '/clients', icon: Users },
+  { label: 'Documents', path: '/documents', icon: FileText },
+  { label: 'Correspondence', path: '/correspondence', icon: Mail },
+  { label: 'Procurement', path: '/procurement', icon: ShoppingCart },
+  { label: 'Employees', path: '/employees', icon: UserCog },
+  { label: 'Calendar', path: '/calendar', icon: Calendar },
+  { label: 'Reports', path: '/reports', icon: BarChart3 },
+  { label: 'Settings', path: '/settings', icon: Settings },
 ];
 
 const MobileSidebar: React.FC = () => {
   const { mobileSidebarOpen, setMobileSidebarOpen } = useUIStore();
-  const { user, logout } = useAuth();
+  const { user, logout } = useAuthStore();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
