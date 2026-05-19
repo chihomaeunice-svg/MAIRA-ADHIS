@@ -1,3 +1,4 @@
+
 # Dependencies
 node_modules/
 server/node_modules/
@@ -28,3 +29,5 @@ Thumbs.db
 # Prisma
 prisma/*.db
 prisma/*.db-journal
+
+node_modules
