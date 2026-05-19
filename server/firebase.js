@@ -18,7 +18,7 @@ const initializeFirebase = () => {
     } else {
       // For development without service account
       admin.initializeApp({
-        projectId: process.env.FIREBASE_PROJECT_ID || 'maira-adhis-dev',
+        projectId: process.env.FIREBASE_PROJECT_ID || 'maira-adhis',
       });
     }
   }
