@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Scale, Eye, EyeOff, Lock, Mail, AlertCircle } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Scale, Eye, EyeOff, Lock, Mail, AlertCircle, ArrowLeft } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { User } from '@/types';
 import toast from 'react-hot-toast';
@@ -78,8 +78,8 @@ const LoginPage: React.FC = () => {
         {/* Login Card */}
         <div className="bg-white rounded-2xl shadow-2xl p-8">
           <div className="mb-6">
-            <h2 className="text-xl font-semibold text-gray-900">Sign in to your account</h2>
-            <p className="text-sm text-gray-500 mt-1">Access the Law Firm Management System</p>
+            <h2 className="text-xl font-semibold text-gray-900">Staff Portal Login</h2>
+            <p className="text-sm text-gray-500 mt-1">Sign in to access the Law Firm Management System</p>
           </div>
 
           {error && (
@@ -168,9 +168,14 @@ const LoginPage: React.FC = () => {
           </div>
         </div>
 
-        <p className="text-center text-primary-300 text-xs mt-6">
-          &copy; {new Date().getFullYear()} MAIRA &amp; ADHIS ADVOCATES. All rights reserved.
-        </p>
+        <div className="text-center mt-6 space-y-2">
+          <Link to="/" className="inline-flex items-center gap-1.5 text-primary-300 hover:text-white text-sm transition-colors">
+            <ArrowLeft className="h-3.5 w-3.5" /> Back to Main Website
+          </Link>
+          <p className="text-primary-400 text-xs">
+            &copy; {new Date().getFullYear()} MAIRA &amp; ADHIS ADVOCATES. All rights reserved.
+          </p>
+        </div>
       </div>
     </div>
   );
