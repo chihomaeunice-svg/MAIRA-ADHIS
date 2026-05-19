@@ -1,0 +1,118 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-gray-50 text-gray-900;
+  }
+}
+
+@layer utilities {
+  .sidebar-transition {
+    transition: width 0.3s ease;
+  }
+
+  .text-navy-900 {
+    color: #1B2B6B;
+  }
+
+  .text-navy-800 {
+    color: #2a3f8f;
+  }
+
+  .text-gold-400 {
+    color: #d4aa2e;
+  }
+
+  .text-gold-500 {
+    color: #C9A227;
+  }
+
+  .text-gold-600 {
+    color: #b38d22;
+  }
+
+  .bg-navy-900 {
+    background-color: #1B2B6B;
+  }
+
+  .bg-navy-800 {
+    background-color: #2a3f8f;
+  }
+
+  .bg-navy-700 {
+    background-color: #36519b;
+  }
+
+  .bg-navy-100 {
+    background-color: #d5d9f1;
+  }
+
+  .bg-gold-100 {
+    background-color: #faf0c8;
+  }
+
+  .bg-gold-500 {
+    background-color: #C9A227;
+  }
+
+  .hover\:bg-navy-800:hover {
+    background-color: #2a3f8f;
+  }
+
+  .focus\:ring-navy-900:focus {
+    --tw-ring-color: #1B2B6B;
+  }
+
+  .border-navy-700 {
+    border-color: #36519b;
+  }
+
+  .border-navy-200 {
+    border-color: #aab3e4;
+  }
+
+  .border-gold-400 {
+    border-color: #d4aa2e;
+  }
+
+  .hover\:text-gold-500:hover {
+    color: #C9A227;
+  }
+
+  .hover\:text-gold-600:hover {
+    color: #b38d22;
+  }
+}
+
+/* Scrollbar styles */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
