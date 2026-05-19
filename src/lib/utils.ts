@@ -1,54 +1,47 @@
-import { type ClassValue, clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { type ClassValue, clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
 
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
+export function cn(...inputs: ClassValue[]) { return twMerge(clsx(inputs)); }
+
+export function formatDate(date: Date | string): string {
+  return new Date(date).toLocaleDateString("en-TZ", { year: "numeric", month: "long", day: "numeric" });
+}
+
+export function formatCurrency(amount: number): string {
+  return `TZS ${new Intl.NumberFormat("en-TZ", { maximumFractionDigits: 0 }).format(amount)}`;
+}
+
+export function generateCaseNumber(): string {
+  return `MA/${new Date().getFullYear()}/${Math.floor(Math.random() * 9000) + 1000}`;
+}
+
+export function generateReferenceNumber(prefix: string): string {
+  return `${prefix}/${new Date().getFullYear()}/${Math.floor(Math.random() * 9000) + 1000}`;
 }
 
 export function getStatusColor(status: string): string {
-  switch (status) {
-    case 'NEW':
-      return 'bg-blue-50 text-blue-700';
-    case 'ONGOING':
-      return 'bg-amber-50 text-amber-700';
-    case 'COMPLETED':
-      return 'bg-green-50 text-green-700';
-    case 'ARCHIVED':
-      return 'bg-gray-100 text-gray-600';
-    case 'APPROVED':
-      return 'bg-green-50 text-green-700';
-    case 'PENDING':
-      return 'bg-yellow-50 text-yellow-700';
-    case 'REJECTED':
-      return 'bg-red-50 text-red-700';
-    case 'DELIVERED':
-      return 'bg-teal-50 text-teal-700';
-    default:
-      return 'bg-gray-50 text-gray-700';
-  }
+  const colors: Record<string, string> = {
+    NEW: "bg-blue-100 text-blue-800",
+    ONGOING: "bg-yellow-100 text-yellow-800",
+    COMPLETED: "bg-green-100 text-green-800",
+    ARCHIVED: "bg-gray-100 text-gray-800",
+    PENDING: "bg-orange-100 text-orange-800",
+    APPROVED: "bg-green-100 text-green-800",
+    REJECTED: "bg-red-100 text-red-800",
+  };
+  return colors[status] || "bg-gray-100 text-gray-800";
 }
 
-export function formatCurrency(amount: number, currency = 'TZS'): string {
-  return `${currency} ${amount.toLocaleString()}`;
+export function truncateText(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength) + "...";
 }
 
-export function formatDate(date: Date | string, locale = 'en-TZ'): string {
-  const d = typeof date === 'string' ? new Date(date) : date;
-  return d.toLocaleDateString(locale, {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
-}
-
-export function formatShortDate(date: Date | string, locale = 'en-TZ'): string {
-  const d = typeof date === 'string' ? new Date(date) : date;
-  return d.toLocaleDateString(locale);
-}
-
-export function truncate(text: string, length = 50): string {
-  if (text.length <= length) return text;
-  return text.slice(0, length) + '...';
+export function getDaysUntil(date: Date | string): number {
+  const target = new Date(date);
+  const today = new Date();
+  const diff = target.getTime() - today.getTime();
+  return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
 export function formatFileSize(bytes: number): string {

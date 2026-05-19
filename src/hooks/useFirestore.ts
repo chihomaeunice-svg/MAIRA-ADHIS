@@ -26,7 +26,7 @@ export function useFirestore<T extends DocumentData>(collectionName: string) {
     try {
       const q = query(collection(db, collectionName), ...constraints, orderBy('createdAt', 'desc'));
       const snapshot = await getDocs(q);
-      const items = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as (T & { id: string })[];
+      const items = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as unknown as (T & { id: string })[];
       setData(items);
       return items;
     } catch (err) {
@@ -44,9 +44,9 @@ export function useFirestore<T extends DocumentData>(collectionName: string) {
 
   const create = useCallback(async (item: Omit<T, 'id'>) => {
     try {
-      const data = { ...item, createdAt: new Date() };
-      const docRef = await addDoc(collection(db, collectionName), data);
-      const newItem = { id: docRef.id, ...data } as T & { id: string };
+      const newData = { ...item, createdAt: new Date() };
+      const docRef = await addDoc(collection(db, collectionName), newData);
+      const newItem = { id: docRef.id, ...newData } as unknown as T & { id: string };
       setData(prev => [newItem, ...prev]);
       return newItem;
     } catch (err) {

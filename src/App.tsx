@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { Toaster } from 'react-hot-toast';
+import { useAuthStore } from '@/stores/authStore';
+import DashboardLayout from '@/components/layout/DashboardLayout';
 
 // Pages
 import LoginPage from '@/pages/LoginPage';
@@ -19,14 +20,14 @@ import SettingsPage from '@/pages/SettingsPage';
 import NotFoundPage from '@/pages/NotFoundPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading } = useAuthStore();
 
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="w-8 h-8 border-4 border-[#1B2B6B] border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-          <p className="text-gray-500 text-sm">Loading...</p>
+          <div className="w-10 h-10 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+          <p className="text-gray-500 text-sm font-medium">Loading...</p>
         </div>
       </div>
     );
@@ -40,13 +41,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading } = useAuthStore();
 
   if (isLoading) return null;
-
-  if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />;
-  }
+  if (isAuthenticated) return <Navigate to="/dashboard" replace />;
 
   return <>{children}</>;
 }
@@ -65,11 +63,14 @@ function AppRoutes() {
         }
       />
 
+      {/* Protected Dashboard Routes */}
       <Route
         path="/dashboard"
         element={
           <ProtectedRoute>
-            <DashboardPage />
+            <DashboardLayout>
+              <DashboardPage />
+            </DashboardLayout>
           </ProtectedRoute>
         }
       />
@@ -78,7 +79,9 @@ function AppRoutes() {
         path="/cases"
         element={
           <ProtectedRoute>
-            <CasesPage />
+            <DashboardLayout>
+              <CasesPage />
+            </DashboardLayout>
           </ProtectedRoute>
         }
       />
@@ -87,7 +90,9 @@ function AppRoutes() {
         path="/cases/:id"
         element={
           <ProtectedRoute>
-            <CaseDetailPage />
+            <DashboardLayout>
+              <CaseDetailPage />
+            </DashboardLayout>
           </ProtectedRoute>
         }
       />
@@ -96,7 +101,9 @@ function AppRoutes() {
         path="/clients"
         element={
           <ProtectedRoute>
-            <ClientsPage />
+            <DashboardLayout>
+              <ClientsPage />
+            </DashboardLayout>
           </ProtectedRoute>
         }
       />
@@ -105,7 +112,9 @@ function AppRoutes() {
         path="/clients/:id"
         element={
           <ProtectedRoute>
-            <ClientDetailPage />
+            <DashboardLayout>
+              <ClientDetailPage />
+            </DashboardLayout>
           </ProtectedRoute>
         }
       />
@@ -114,7 +123,9 @@ function AppRoutes() {
         path="/documents"
         element={
           <ProtectedRoute>
-            <DocumentsPage />
+            <DashboardLayout>
+              <DocumentsPage />
+            </DashboardLayout>
           </ProtectedRoute>
         }
       />
@@ -123,7 +134,9 @@ function AppRoutes() {
         path="/correspondence"
         element={
           <ProtectedRoute>
-            <CorrespondencePage />
+            <DashboardLayout>
+              <CorrespondencePage />
+            </DashboardLayout>
           </ProtectedRoute>
         }
       />
@@ -132,7 +145,9 @@ function AppRoutes() {
         path="/procurement"
         element={
           <ProtectedRoute>
-            <ProcurementPage />
+            <DashboardLayout>
+              <ProcurementPage />
+            </DashboardLayout>
           </ProtectedRoute>
         }
       />
@@ -141,7 +156,9 @@ function AppRoutes() {
         path="/employees"
         element={
           <ProtectedRoute>
-            <EmployeesPage />
+            <DashboardLayout>
+              <EmployeesPage />
+            </DashboardLayout>
           </ProtectedRoute>
         }
       />
@@ -150,7 +167,9 @@ function AppRoutes() {
         path="/calendar"
         element={
           <ProtectedRoute>
-            <CalendarPage />
+            <DashboardLayout>
+              <CalendarPage />
+            </DashboardLayout>
           </ProtectedRoute>
         }
       />
@@ -159,7 +178,9 @@ function AppRoutes() {
         path="/reports"
         element={
           <ProtectedRoute>
-            <ReportsPage />
+            <DashboardLayout>
+              <ReportsPage />
+            </DashboardLayout>
           </ProtectedRoute>
         }
       />
@@ -168,7 +189,9 @@ function AppRoutes() {
         path="/settings"
         element={
           <ProtectedRoute>
-            <SettingsPage />
+            <DashboardLayout>
+              <SettingsPage />
+            </DashboardLayout>
           </ProtectedRoute>
         }
       />
@@ -181,19 +204,17 @@ function AppRoutes() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            duration: 3000,
-            style: {
-              borderRadius: '8px',
-              fontSize: '14px',
-            },
-          }}
-        />
-      </AuthProvider>
+      <AppRoutes />
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            borderRadius: '8px',
+            fontSize: '14px',
+          },
+        }}
+      />
     </BrowserRouter>
   );
 }

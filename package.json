@@ -7,11 +7,11 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "server": "cd server && node index.js"
+    "server": "node server/index.js"
   },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "react-router-dom": "^6.22.0",
     "firebase": "^10.8.0",
     "zustand": "^4.5.0",

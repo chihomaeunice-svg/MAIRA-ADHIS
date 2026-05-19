@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Briefcase, Users, FileText, Mail, ShoppingCart,
   UserCog, Calendar, BarChart3, Settings, LogOut, Scale, ChevronLeft, ChevronRight,
 } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuthStore } from '@/stores/authStore';
 import { useUIStore } from '@/stores/uiStore';
 
 interface NavItem {
@@ -29,51 +29,52 @@ const navSections: NavSection[] = [
   {
     title: 'CASE MANAGEMENT',
     items: [
-      { label: 'Cases', path: '/dashboard/cases', icon: Briefcase },
-      { label: 'Clients', path: '/dashboard/clients', icon: Users },
+      { label: 'Cases', path: '/cases', icon: Briefcase },
+      { label: 'Clients', path: '/clients', icon: Users },
     ],
   },
   {
     title: 'ADMINISTRATION',
     items: [
-      { label: 'Documents', path: '/dashboard/documents', icon: FileText },
-      { label: 'Correspondence', path: '/dashboard/correspondence', icon: Mail },
-      { label: 'Procurement', path: '/dashboard/procurement', icon: ShoppingCart },
-      { label: 'Employees', path: '/dashboard/employees', icon: UserCog },
+      { label: 'Documents', path: '/documents', icon: FileText },
+      { label: 'Correspondence', path: '/correspondence', icon: Mail },
+      { label: 'Procurement', path: '/procurement', icon: ShoppingCart },
+      { label: 'Employees', path: '/employees', icon: UserCog },
     ],
   },
   {
     title: 'TOOLS',
     items: [
-      { label: 'Calendar', path: '/dashboard/calendar', icon: Calendar },
-      { label: 'Reports', path: '/dashboard/reports', icon: BarChart3 },
+      { label: 'Calendar', path: '/calendar', icon: Calendar },
+      { label: 'Reports', path: '/reports', icon: BarChart3 },
     ],
   },
   {
     title: 'SYSTEM',
     items: [
-      { label: 'Settings', path: '/dashboard/settings', icon: Settings },
+      { label: 'Settings', path: '/settings', icon: Settings },
     ],
   },
 ];
 
 const Sidebar: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout } = useAuthStore();
   const { sidebarOpen, toggleSidebar } = useUIStore();
   const navigate = useNavigate();
 
-  const handleLogout = async () => {
-    await logout();
-    navigate('/');
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
   };
 
   return (
     <aside
       className={clsx(
-        'fixed left-0 top-0 bottom-0 z-30 flex flex-col bg-primary-600 transition-all duration-300',
+        'fixed left-0 top-0 bottom-0 z-30 hidden lg:flex flex-col bg-primary-600 transition-all duration-300',
         sidebarOpen ? 'w-64' : 'w-16'
       )}
     >
+      {/* Logo */}
       <div className="flex items-center justify-between px-4 py-4 border-b border-primary-700">
         <div className={clsx('flex items-center gap-3 overflow-hidden', !sidebarOpen && 'justify-center w-full')}>
           <div className="w-8 h-8 flex-shrink-0 bg-accent-500 rounded-lg flex items-center justify-center">
@@ -103,6 +104,7 @@ const Sidebar: React.FC = () => {
         )}
       </div>
 
+      {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-4 space-y-5">
         {navSections.map((section) => (
           <div key={section.title}>
@@ -131,7 +133,12 @@ const Sidebar: React.FC = () => {
                   >
                     {({ isActive }) => (
                       <>
-                        <item.icon className={clsx('h-5 w-5 flex-shrink-0', isActive ? 'text-white' : 'text-primary-200 group-hover:text-white')} />
+                        <item.icon
+                          className={clsx(
+                            'h-5 w-5 flex-shrink-0',
+                            isActive ? 'text-white' : 'text-primary-200 group-hover:text-white'
+                          )}
+                        />
                         {sidebarOpen && <span className="truncate">{item.label}</span>}
                         {!sidebarOpen && (
                           <span className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50 transition-opacity">
@@ -148,6 +155,7 @@ const Sidebar: React.FC = () => {
         ))}
       </nav>
 
+      {/* User Footer */}
       <div className="border-t border-primary-700 p-3">
         <div className={clsx('flex items-center gap-3', !sidebarOpen && 'justify-center flex-col')}>
           <div className="w-8 h-8 rounded-full bg-accent-500 flex items-center justify-center flex-shrink-0">
@@ -158,13 +166,13 @@ const Sidebar: React.FC = () => {
           {sidebarOpen && (
             <div className="flex-1 min-w-0">
               <p className="text-white text-sm font-medium truncate">{user?.name || 'User'}</p>
-              <p className="text-primary-300 text-xs truncate">{user?.role || 'ADVOCATE'}</p>
+              <p className="text-primary-300 text-xs truncate">{user?.role?.replace('_', ' ') || 'ADVOCATE'}</p>
             </div>
           )}
           <button
             onClick={handleLogout}
             className="flex-shrink-0 p-1.5 rounded-lg text-primary-300 hover:text-red-400 hover:bg-primary-700 transition-colors"
-            title="Logout"
+            title="Sign Out"
           >
             <LogOut className="h-4 w-4" />
           </button>
