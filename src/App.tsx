@@ -4,6 +4,9 @@ import { useAuthStore } from '@/stores/authStore';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 
 // Pages
+import LandingPage from '@/pages/public/LandingPage';
+import AboutPage from '@/pages/public/AboutPage';
+import ContactPage from '@/pages/public/ContactPage';
 import LoginPage from '@/pages/LoginPage';
 import DashboardPage from '@/pages/DashboardPage';
 import CasesPage from '@/pages/CasesPage';
@@ -52,7 +55,10 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      {/* Public website routes */}
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/about" element={<AboutPage />} />
+      <Route path="/contact" element={<ContactPage />} />
 
       <Route
         path="/login"

@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
 import {
   LayoutDashboard, Briefcase, Users, FileText, Mail, ShoppingCart,
-  UserCog, Calendar, BarChart3, Settings, LogOut, Scale, ChevronLeft, ChevronRight,
+  UserCog, Calendar, BarChart3, Settings, LogOut, Scale, ChevronLeft, ChevronRight, Globe,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { useUIStore } from '@/stores/uiStore';
@@ -154,6 +154,27 @@ const Sidebar: React.FC = () => {
           </div>
         ))}
       </nav>
+
+      {/* Back to Website */}
+      <div className="px-3 pb-2">
+        <NavLink
+          to="/"
+          className={clsx(
+            'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all group',
+            !sidebarOpen && 'justify-center',
+            'text-primary-300 hover:bg-primary-700 hover:text-white'
+          )}
+          title={!sidebarOpen ? 'Back to Website' : undefined}
+        >
+          <Globe className="h-4 w-4 flex-shrink-0 text-primary-300 group-hover:text-white" />
+          {sidebarOpen && <span className="text-xs">Back to Website</span>}
+          {!sidebarOpen && (
+            <span className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">
+              Back to Website
+            </span>
+          )}
+        </NavLink>
+      </div>
 
       {/* User Footer */}
       <div className="border-t border-primary-700 p-3">
