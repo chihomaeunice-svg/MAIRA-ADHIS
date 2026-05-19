@@ -59,8 +59,8 @@ const LandingPage: React.FC = () => {
                   {item}
                 </a>
               ))}
-              <Link to="/login" className="ml-2 bg-accent-500 hover:bg-accent-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors">
-                Client Portal
+              <Link to="/login" className="ml-2 border border-white/30 text-white hover:bg-white/10 px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5">
+                <Lock className="h-3.5 w-3.5" /> Staff Login
               </Link>
             </div>
             <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden text-white p-2">
@@ -75,7 +75,7 @@ const LandingPage: React.FC = () => {
                 </a>
               ))}
               <Link to="/login" className="block mt-3 bg-accent-500 text-white px-4 py-2 rounded-lg text-sm font-semibold text-center" onClick={() => setMobileMenuOpen(false)}>
-                Client Portal
+                Staff Login
               </Link>
             </div>
           )}
@@ -108,6 +108,19 @@ const LandingPage: React.FC = () => {
               <a href="#practice-areas" className="border-2 border-white/30 text-white hover:bg-white/10 px-8 py-3.5 rounded-xl font-semibold transition-all flex items-center gap-2">
                 Learn More <ChevronRight className="h-4 w-4" />
               </a>
+            </div>
+            {/* Staff Portal CTA */}
+            <div className="mt-8 inline-flex items-center gap-4 bg-white/10 border border-white/20 rounded-2xl px-5 py-4">
+              <div className="w-10 h-10 bg-accent-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Lock className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <p className="text-white text-sm font-semibold">Staff & Advocates Portal</p>
+                <p className="text-primary-200 text-xs">Manage cases, documents & clients</p>
+              </div>
+              <Link to="/login" className="ml-2 bg-white text-primary-700 hover:bg-accent-400 hover:text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors whitespace-nowrap">
+                Sign In →
+              </Link>
             </div>
           </div>
           <div className="flex justify-center">
@@ -370,7 +383,7 @@ const LandingPage: React.FC = () => {
                 {['Home', 'About Us', 'Practice Areas', 'Contact Us'].map(l => (
                   <li key={l}><a href="#" className="hover:text-accent-400 transition-colors">{l}</a></li>
                 ))}
-                <li><Link to="/login" className="hover:text-accent-400 transition-colors">Client Portal</Link></li>
+                <li><Link to="/login" className="hover:text-accent-400 transition-colors">Staff Login</Link></li>
               </ul>
             </div>
             <div>
