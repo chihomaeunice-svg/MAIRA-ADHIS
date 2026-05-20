@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
@@ -28,7 +29,14 @@ import UserManagementPage from '@/pages/dashboard/UserManagementPage';
 import NotFoundPage from '@/pages/NotFoundPage';
 
 function AppInitializer({ children }: { children: React.ReactNode }) {
+  const { isLocalSession, setLoading } = useAuthStore();
   useAuth(); // sets up onAuthStateChanged listener
+
+  // Local sessions don't need to wait for Firebase — unblock immediately
+  useEffect(() => {
+    if (isLocalSession) setLoading(false);
+  }, [isLocalSession, setLoading]);
+
   return <>{children}</>;
 }
 

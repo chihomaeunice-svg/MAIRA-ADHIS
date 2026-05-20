@@ -6,7 +6,8 @@ interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  setUser: (user: User | null) => void;
+  isLocalSession: boolean;
+  setUser: (user: User | null, local?: boolean) => void;
   setLoading: (loading: boolean) => void;
   logout: () => void;
   hasRole: (roles: UserRole[]) => boolean;
@@ -19,15 +20,16 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       isAuthenticated: false,
       isLoading: true,
+      isLocalSession: false,
 
-      setUser: (user) => {
-        set({ user, isAuthenticated: !!user, isLoading: false });
+      setUser: (user, local = false) => {
+        set({ user, isAuthenticated: !!user, isLoading: false, isLocalSession: local });
       },
 
       setLoading: (isLoading) => set({ isLoading }),
 
       logout: () => {
-        set({ user: null, isAuthenticated: false, isLoading: false });
+        set({ user: null, isAuthenticated: false, isLoading: false, isLocalSession: false });
       },
 
       hasRole: (roles: UserRole[]) => {
@@ -43,7 +45,11 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
-      partialize: (state) => ({ user: state.user, isAuthenticated: state.isAuthenticated }),
+      partialize: (state) => ({
+        user: state.user,
+        isAuthenticated: state.isAuthenticated,
+        isLocalSession: state.isLocalSession,
+      }),
     }
   )
 );
