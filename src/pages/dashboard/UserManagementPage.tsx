@@ -16,8 +16,61 @@ const ALL_ROLES: UserRole[] = [
   'ACCOUNTANT', 'PROCUREMENT_OFFICER', 'EMPLOYEE',
 ];
 
+const LOCAL_FALLBACK_USERS: FirestoreUser[] = [
+  {
+    uid: 'local-admin',
+    name: 'Admin User',
+    email: 'admin@adhisadvocates.co.tz',
+    role: 'ADMIN',
+    status: 'ACTIVE',
+    createdAt: new Date('2024-01-01'),
+    updatedAt: new Date('2024-01-01'),
+    lastLogin: new Date(),
+  },
+  {
+    uid: 'local-partner',
+    name: 'Managing Partner',
+    email: 'partner@adhisadvocates.co.tz',
+    role: 'MANAGING_PARTNER',
+    status: 'ACTIVE',
+    createdAt: new Date('2024-01-01'),
+    updatedAt: new Date('2024-01-01'),
+    lastLogin: new Date(),
+  },
+  {
+    uid: 'local-advocate',
+    name: 'Senior Advocate',
+    email: 'advocate@adhisadvocates.co.tz',
+    role: 'ADVOCATE',
+    status: 'ACTIVE',
+    createdAt: new Date('2024-02-01'),
+    updatedAt: new Date('2024-02-01'),
+    lastLogin: null,
+  },
+  {
+    uid: 'local-secretary',
+    name: 'Office Secretary',
+    email: 'secretary@adhisadvocates.co.tz',
+    role: 'SECRETARY',
+    status: 'ACTIVE',
+    createdAt: new Date('2024-03-01'),
+    updatedAt: new Date('2024-03-01'),
+    lastLogin: null,
+  },
+  {
+    uid: 'local-accountant',
+    name: 'Firm Accountant',
+    email: 'accountant@adhisadvocates.co.tz',
+    role: 'ACCOUNTANT',
+    status: 'ACTIVE',
+    createdAt: new Date('2024-03-01'),
+    updatedAt: new Date('2024-03-01'),
+    lastLogin: null,
+  },
+];
+
 const UserManagementPage: React.FC = () => {
-  const { user: currentUser } = useAuthStore();
+  const { user: currentUser, isLocalSession } = useAuthStore();
   const [users, setUsers] = useState<FirestoreUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -27,6 +80,11 @@ const UserManagementPage: React.FC = () => {
 
   const fetchUsers = async () => {
     setLoading(true);
+    if (isLocalSession) {
+      setUsers(LOCAL_FALLBACK_USERS);
+      setLoading(false);
+      return;
+    }
     try {
       const snap = await getDocs(collection(db, 'users'));
       const data = snap.docs.map(d => ({
@@ -36,12 +94,11 @@ const UserManagementPage: React.FC = () => {
         updatedAt: d.data().updatedAt?.toDate?.() ?? new Date(),
         lastLogin: d.data().lastLogin?.toDate?.() ?? null,
       })) as FirestoreUser[];
-      setUsers(data.sort((a, b) => {
-        const order = ALL_ROLES;
-        return order.indexOf(a.role) - order.indexOf(b.role);
-      }));
+      const sorted = data.sort((a, b) => ALL_ROLES.indexOf(a.role) - ALL_ROLES.indexOf(b.role));
+      setUsers(sorted.length > 0 ? sorted : LOCAL_FALLBACK_USERS);
     } catch {
-      toast.error('Failed to load users');
+      toast.error('Failed to load users — showing local data');
+      setUsers(LOCAL_FALLBACK_USERS);
     } finally {
       setLoading(false);
     }
