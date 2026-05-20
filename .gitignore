@@ -30,4 +30,9 @@ Thumbs.db
 prisma/*.db
 prisma/*.db-journal
 
+# Firebase service account key (NEVER commit this)
+serviceAccount.json
+server/serviceAccount.json
+*-firebase-adminsdk-*.json
+
 node_modules

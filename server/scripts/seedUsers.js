@@ -17,16 +17,25 @@
  */
 
 const admin = require('firebase-admin');
+const path = require('path');
+const fs = require('fs');
 
 // Initialize Firebase Admin
 if (!admin.apps.length) {
-  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  // Option 1: serviceAccount.json file in server/ folder
+  const keyPath = path.join(__dirname, '..', 'serviceAccount.json');
+  if (fs.existsSync(keyPath)) {
+    const serviceAccount = require(keyPath);
+    admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+  } else if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    // Option 2: environment variable
     admin.initializeApp({
       credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)),
     });
   } else {
-    // Uses Application Default Credentials (works in Google Cloud / CI)
-    admin.initializeApp({ projectId: 'maira-adhis' });
+    console.error('❌ No service account found.');
+    console.error('   Place serviceAccount.json in the server/ folder and try again.');
+    process.exit(1);
   }
 }
 
