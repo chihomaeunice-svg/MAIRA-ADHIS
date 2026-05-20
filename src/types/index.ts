@@ -1,4 +1,18 @@
-export type UserRole = 'ADMIN' | 'MANAGING_PARTNER' | 'ADVOCATE' | 'SECRETARY' | 'ACCOUNTANT' | 'PROCUREMENT_OFFICER';
+export type UserRole = 'ADMIN' | 'MANAGING_PARTNER' | 'ADVOCATE' | 'SECRETARY' | 'ACCOUNTANT' | 'PROCUREMENT_OFFICER' | 'EMPLOYEE';
+
+export interface FirestoreUser {
+  uid: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  department?: string;
+  phone?: string;
+  avatar?: string;
+  status: 'ACTIVE' | 'INACTIVE' | 'PENDING';
+  createdAt: Date;
+  updatedAt: Date;
+  lastLogin?: Date;
+}
 
 export type CaseStatus = 'NEW' | 'ONGOING' | 'COMPLETED' | 'ARCHIVED';
 
