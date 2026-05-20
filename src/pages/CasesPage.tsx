@@ -1,11 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Filter, Briefcase, Eye, Calendar, User } from 'lucide-react';
-import { mockCases } from '@/data/mockData';
+import { Plus, Search, Filter, Briefcase, Eye, Calendar, User, X } from 'lucide-react';
+import {
+  collection, addDoc, getDocs, query, orderBy, Timestamp,
+} from 'firebase/firestore';
+import { db } from '@/firebase';
+import { mockCases, mockEmployees } from '@/data/mockData';
 import { Case, CaseStatus } from '@/types';
 import { formatDate, getStatusColor } from '@/lib/utils';
 import { useUIStore } from '@/stores/uiStore';
+import { useAuthStore } from '@/stores/authStore';
 import { clsx } from 'clsx';
+import toast from 'react-hot-toast';
 
 const STATUSES: { value: CaseStatus | 'ALL'; label: string }[] = [
   { value: 'ALL', label: 'All Cases' },
@@ -22,17 +28,123 @@ const CATEGORIES = [
   'Labour Law',
   'Family Matters',
   'Conveyances & Property',
+  'Notary Public',
+  'Other',
 ];
+
+const COURT_NAMES = [
+  'High Court of Tanzania',
+  'Resident Magistrate Court - Kinondoni',
+  'Resident Magistrate Court - Ilala',
+  'Labour Court of Tanzania',
+  'Court of Appeal',
+  'District Court',
+  'Other',
+];
+
+const CASE_CATEGORIES = [
+  'Commercial & Corporate',
+  'Criminal Defense',
+  'Labour Law',
+  'Family Matters',
+  'Conveyances & Property',
+  'Notary Public',
+  'Other',
+];
+
+function generateCaseNumber(): string {
+  const year = new Date().getFullYear();
+  const num = String(Math.floor(Math.random() * 9000) + 1000);
+  return `HC/CASE/${year}/${num}`;
+}
+
+interface NewCaseForm {
+  caseNumber: string;
+  title: string;
+  courtName: string;
+  plaintiff: string;
+  defendant: string;
+  advocateId: string;
+  advocateName: string;
+  filingDate: string;
+  firstHearingDate: string;
+  category: string;
+  description: string;
+  status: CaseStatus;
+}
+
+const defaultForm = (): NewCaseForm => ({
+  caseNumber: generateCaseNumber(),
+  title: '',
+  courtName: 'High Court of Tanzania',
+  plaintiff: '',
+  defendant: '',
+  advocateId: '',
+  advocateName: '',
+  filingDate: new Date().toISOString().split('T')[0],
+  firstHearingDate: '',
+  category: 'Commercial & Corporate',
+  description: '',
+  status: 'NEW',
+});
 
 const CasesPage: React.FC = () => {
   const { setPageTitle } = useUIStore();
-  const [cases] = useState<Case[]>(mockCases);
+  const { user } = useAuthStore();
+  const [cases, setCases] = useState<Case[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<CaseStatus | 'ALL'>('ALL');
   const [categoryFilter, setCategoryFilter] = useState('All Categories');
   const [showFilters, setShowFilters] = useState(false);
+  const [showNewCase, setShowNewCase] = useState(false);
+  const [form, setForm] = useState<NewCaseForm>(defaultForm());
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => { setPageTitle('Cases'); }, [setPageTitle]);
+
+  const fetchCases = useCallback(async () => {
+    setLoading(true);
+    try {
+      const q = query(collection(db, 'cases'), orderBy('createdAt', 'desc'));
+      const snap = await getDocs(q);
+      if (snap.docs.length > 0) {
+        const fetched: Case[] = snap.docs.map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            caseNumber: data.caseNumber,
+            title: data.title,
+            courtName: data.courtName,
+            partiesNames: data.partiesNames || { plaintiff: '', defendant: '' },
+            advocateId: data.advocateId || '',
+            advocateName: data.advocateName || '',
+            clientId: data.clientId || '',
+            clientName: data.clientName || data.partiesNames?.plaintiff || '',
+            filingDate: data.filingDate?.toDate ? data.filingDate.toDate() : new Date(data.filingDate),
+            hearingDates: data.hearingDates || [],
+            status: data.status,
+            category: data.category,
+            description: data.description || '',
+            notes: data.notes || [],
+            documents: data.documents || [],
+            judgment: data.judgment,
+            createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt),
+            updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(data.updatedAt || data.createdAt),
+          };
+        });
+        setCases(fetched);
+      } else {
+        setCases(mockCases);
+      }
+    } catch {
+      setCases(mockCases);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchCases(); }, [fetchCases]);
 
   const filtered = cases.filter((c) => {
     const matchSearch =
@@ -54,6 +166,61 @@ const CasesPage: React.FC = () => {
     ARCHIVED: cases.filter((c) => c.status === 'ARCHIVED').length,
   };
 
+  const handleAdvocateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const emp = mockEmployees.find((em) => em.id === e.target.value);
+    setForm((p) => ({
+      ...p,
+      advocateId: emp?.id || '',
+      advocateName: emp?.fullName || '',
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.title.trim()) { toast.error('Case title is required'); return; }
+    if (!form.plaintiff.trim()) { toast.error('Plaintiff name is required'); return; }
+    if (!form.defendant.trim()) { toast.error('Defendant name is required'); return; }
+    setSaving(true);
+    try {
+      const now = Timestamp.now();
+      const hearingDates = form.firstHearingDate
+        ? [{ id: `h-${Date.now()}`, date: Timestamp.fromDate(new Date(form.firstHearingDate)), venue: form.courtName, purpose: 'First Hearing' }]
+        : [];
+
+      await addDoc(collection(db, 'cases'), {
+        caseNumber: form.caseNumber,
+        title: form.title.trim(),
+        courtName: form.courtName,
+        partiesNames: { plaintiff: form.plaintiff.trim(), defendant: form.defendant.trim() },
+        advocateId: form.advocateId,
+        advocateName: form.advocateName,
+        clientId: '',
+        clientName: form.plaintiff.trim(),
+        filingDate: Timestamp.fromDate(new Date(form.filingDate)),
+        hearingDates,
+        status: form.status,
+        category: form.category,
+        description: form.description.trim(),
+        notes: [],
+        documents: [],
+        addedBy: user?.id || 'unknown',
+        addedByName: user?.name || 'Unknown',
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      toast.success('Case added successfully');
+      setShowNewCase(false);
+      setForm(defaultForm());
+      fetchCases();
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to save case. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -61,10 +228,13 @@ const CasesPage: React.FC = () => {
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Cases</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {filtered.length} of {cases.length} cases
+            {loading ? 'Loading...' : `${filtered.length} of ${cases.length} cases`}
           </p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors shadow-sm">
+        <button
+          onClick={() => { setForm(defaultForm()); setShowNewCase(true); }}
+          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
+        >
           <Plus className="h-4 w-4" />
           New Case
         </button>
@@ -140,7 +310,12 @@ const CasesPage: React.FC = () => {
 
       {/* Cases Table */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-card overflow-hidden">
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="py-16 flex flex-col items-center gap-3">
+            <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
+            <p className="text-gray-500 text-sm">Loading cases...</p>
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="py-16 text-center">
             <Briefcase className="h-12 w-12 text-gray-300 mx-auto mb-3" />
             <p className="text-gray-500 font-medium">No cases found</p>
@@ -169,9 +344,7 @@ const CasesPage: React.FC = () => {
                           <Briefcase className="h-4 w-4 text-primary-600" />
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-gray-900 hover:text-primary-700">
-                            {c.title}
-                          </p>
+                          <p className="text-sm font-medium text-gray-900">{c.title}</p>
                           <p className="text-xs text-gray-500 mt-0.5">{c.caseNumber}</p>
                           <p className="text-xs text-gray-400 truncate max-w-[200px]">{c.courtName}</p>
                         </div>
@@ -216,6 +389,173 @@ const CasesPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* New Case Modal */}
+      {showNewCase && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-gray-200 sticky top-0 bg-white z-10">
+              <h2 className="text-lg font-semibold text-gray-900">New Case</h2>
+              <button onClick={() => setShowNewCase(false)} className="p-1 hover:bg-gray-100 rounded-lg">
+                <X className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+            <form onSubmit={handleSubmit} className="p-5 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Case Number *</label>
+                  <input
+                    type="text"
+                    required
+                    value={form.caseNumber}
+                    onChange={(e) => setForm((p) => ({ ...p, caseNumber: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Filing Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={form.filingDate}
+                    onChange={(e) => setForm((p) => ({ ...p, filingDate: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Case Title *</label>
+                <input
+                  type="text"
+                  required
+                  value={form.title}
+                  onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
+                  placeholder="e.g. Kimaro v. Mkando Real Estate Ltd"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Court Name *</label>
+                <select
+                  value={form.courtName}
+                  onChange={(e) => setForm((p) => ({ ...p, courtName: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                >
+                  {COURT_NAMES.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Plaintiff Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={form.plaintiff}
+                    onChange={(e) => setForm((p) => ({ ...p, plaintiff: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Defendant Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={form.defendant}
+                    onChange={(e) => setForm((p) => ({ ...p, defendant: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Advocate Handling</label>
+                  <select
+                    value={form.advocateId}
+                    onChange={handleAdvocateChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                  >
+                    <option value="">— Select Advocate —</option>
+                    {mockEmployees.map((emp) => (
+                      <option key={emp.id} value={emp.id}>{emp.fullName}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">First Hearing Date (optional)</label>
+                  <input
+                    type="date"
+                    value={form.firstHearingDate}
+                    onChange={(e) => setForm((p) => ({ ...p, firstHearingDate: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Case Category *</label>
+                  <select
+                    value={form.category}
+                    onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                  >
+                    {CASE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select
+                    value={form.status}
+                    onChange={(e) => setForm((p) => ({ ...p, status: e.target.value as CaseStatus }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                  >
+                    <option value="NEW">NEW</option>
+                    <option value="ONGOING">ONGOING</option>
+                    <option value="COMPLETED">COMPLETED</option>
+                    <option value="ARCHIVED">ARCHIVED</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea
+                  value={form.description}
+                  onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
+                  rows={3}
+                  placeholder="Brief description of the case..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowNewCase(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex-1 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {saving ? (
+                    <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Saving...</>
+                  ) : (
+                    <><Plus className="h-4 w-4" /> Add Case</>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
