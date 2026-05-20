@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Briefcase, Users, Calendar, TrendingUp, Clock, CheckCircle2,
@@ -8,9 +8,15 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, Legend,
 } from 'recharts';
+import {
+  collection, getDocs, query, orderBy, where, Timestamp,
+} from 'firebase/firestore';
+import { db } from '@/firebase';
 import { useAuthStore } from '@/stores/authStore';
 import { useUIStore } from '@/stores/uiStore';
-import { mockCases, mockClients, mockCalendarEvents, mockMonthlyStats, mockExpensesByMonth } from '@/data/mockData';
+import {
+  mockCases, mockClients, mockCalendarEvents, mockMonthlyStats, mockExpensesByMonth,
+} from '@/data/mockData';
 import { formatDate, formatCurrency, getStatusColor } from '@/lib/utils';
 import { clsx } from 'clsx';
 
@@ -20,13 +26,67 @@ const DashboardPage: React.FC = () => {
   const { user } = useAuthStore();
   const { setPageTitle } = useUIStore();
 
+  const [totalCases, setTotalCases] = useState(mockCases.length);
+  const [activeCases, setActiveCases] = useState(mockCases.filter((c) => c.status === 'ONGOING').length);
+  const [newCases, setNewCases] = useState(mockCases.filter((c) => c.status === 'NEW').length);
+  const [completedCases, setCompletedCases] = useState(mockCases.filter((c) => c.status === 'COMPLETED').length);
+  const [monthlyIncome, setMonthlyIncome] = useState(0);
+  const [monthlyExpenses, setMonthlyExpenses] = useState(mockExpensesByMonth[mockExpensesByMonth.length - 1]?.amount || 0);
+
   useEffect(() => {
     setPageTitle('Dashboard');
   }, [setPageTitle]);
 
-  const activeCases = mockCases.filter((c) => c.status === 'ONGOING').length;
-  const newCases = mockCases.filter((c) => c.status === 'NEW').length;
-  const completedCases = mockCases.filter((c) => c.status === 'COMPLETED').length;
+  useEffect(() => {
+    // Fetch cases count from Firestore
+    const fetchCases = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'cases'));
+        if (snap.docs.length > 0) {
+          const data = snap.docs.map((d) => d.data());
+          setTotalCases(data.length);
+          setActiveCases(data.filter((c) => c.status === 'ONGOING').length);
+          setNewCases(data.filter((c) => c.status === 'NEW').length);
+          setCompletedCases(data.filter((c) => c.status === 'COMPLETED').length);
+        }
+      } catch { /* use defaults */ }
+    };
+
+    // Fetch this month's income
+    const fetchIncome = async () => {
+      try {
+        const now = new Date();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+        const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+        const snap = await getDocs(collection(db, 'income'));
+        const total = snap.docs
+          .map((d) => d.data())
+          .filter((d) => d.date >= monthStart && d.date <= monthEnd)
+          .reduce((s, d) => s + (d.amount || 0), 0);
+        setMonthlyIncome(total);
+      } catch { /* use default 0 */ }
+    };
+
+    // Fetch this month's expenses
+    const fetchExpenses = async () => {
+      try {
+        const now = new Date();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+        const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+        const snap = await getDocs(collection(db, 'expenses'));
+        const total = snap.docs
+          .map((d) => d.data())
+          .filter((d) => d.date >= monthStart && d.date <= monthEnd)
+          .reduce((s, d) => s + (d.amount || 0), 0);
+        if (total > 0) setMonthlyExpenses(total);
+      } catch { /* use default */ }
+    };
+
+    fetchCases();
+    fetchIncome();
+    fetchExpenses();
+  }, []);
+
   const totalClients = mockClients.length;
 
   const now = new Date();
@@ -34,13 +94,11 @@ const DashboardPage: React.FC = () => {
     (e) => e.type === 'HEARING' && new Date(e.date) >= now
   ).length;
 
-  const monthlyExpenses = mockExpensesByMonth[mockExpensesByMonth.length - 1]?.amount || 0;
-
   const casesByStatus = [
     { name: 'Ongoing', value: activeCases },
     { name: 'New', value: newCases },
     { name: 'Completed', value: completedCases },
-    { name: 'Archived', value: mockCases.filter((c) => c.status === 'ARCHIVED').length },
+    { name: 'Archived', value: totalCases - activeCases - newCases - completedCases },
   ];
 
   const recentCases = [...mockCases]
@@ -59,7 +117,7 @@ const DashboardPage: React.FC = () => {
       icon: Briefcase,
       color: 'bg-blue-50 text-blue-600',
       border: 'border-blue-200',
-      change: '+2 this month',
+      change: `${newCases} new this month`,
       changeColor: 'text-green-600',
     },
     {
@@ -86,8 +144,8 @@ const DashboardPage: React.FC = () => {
       icon: TrendingUp,
       color: 'bg-red-50 text-red-600',
       border: 'border-red-200',
-      change: 'June 2024',
-      changeColor: 'text-gray-500',
+      change: monthlyIncome > 0 ? `Income: ${formatCurrency(monthlyIncome)}` : 'Track income in Finance',
+      changeColor: monthlyIncome > 0 ? 'text-green-600' : 'text-gray-500',
     },
   ];
 
@@ -111,7 +169,7 @@ const DashboardPage: React.FC = () => {
           <p className="text-primary-200 text-sm mt-1">
             {user?.role?.replace('_', ' ')} &mdash; MAIRA &amp; ADHIS ADVOCATES
           </p>
-          <div className="mt-3 flex items-center gap-4 text-sm">
+          <div className="mt-3 flex items-center gap-4 text-sm flex-wrap">
             <span className="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-full">
               <Briefcase className="h-4 w-4" />
               {activeCases} active cases
@@ -120,6 +178,12 @@ const DashboardPage: React.FC = () => {
               <Calendar className="h-4 w-4" />
               {upcomingHearings} upcoming hearings
             </span>
+            {monthlyIncome > 0 && (
+              <span className="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-full">
+                <TrendingUp className="h-4 w-4" />
+                {formatCurrency(monthlyIncome)} this month
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -152,9 +216,7 @@ const DashboardPage: React.FC = () => {
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
               <XAxis dataKey="month" tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip
-                contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }}
-              />
+              <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }} />
               <Bar dataKey="cases" name="Total Cases" fill="#1B2B6B" radius={[3, 3, 0, 0]} />
               <Bar dataKey="completed" name="Completed" fill="#C9A227" radius={[3, 3, 0, 0]} />
             </BarChart>

@@ -1,232 +1,688 @@
-import React, { useState } from 'react';
-import { BarChart3, FileText, TrendingUp, Users, DollarSign, Download, Printer } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
-import { mockCases, mockClients, mockEmployees, mockExpenses, mockMonthlyStats, mockExpensesByMonth } from '@/data/mockData';
-import Button from '@/components/ui/Button';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  BarChart3, FileText, TrendingUp, Users, DollarSign, Printer,
+  Download, Eye,
+} from 'lucide-react';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, PieChart, Pie, Cell, Legend,
+} from 'recharts';
+import {
+  collection, getDocs, query, orderBy,
+} from 'firebase/firestore';
+import { db } from '@/firebase';
+import {
+  mockCases, mockClients, mockEmployees, mockExpenses, mockMonthlyStats,
+} from '@/data/mockData';
+import { formatDate, formatCurrency } from '@/lib/utils';
 import { clsx } from 'clsx';
 
-const reportTypes = [
-  { id: 'cases', label: 'Case Statistics', icon: BarChart3, color: 'text-blue-600 bg-blue-50' },
-  { id: 'clients', label: 'Client Report', icon: Users, color: 'text-purple-600 bg-purple-50' },
-  { id: 'financial', label: 'Financial Report', icon: DollarSign, color: 'text-green-600 bg-green-50' },
-  { id: 'employees', label: 'Employee Report', icon: FileText, color: 'text-orange-600 bg-orange-50' },
+type TabId = 'cases' | 'financial' | 'documents' | 'employees' | 'clients';
+
+const TABS: { id: TabId; label: string; icon: React.ElementType; color: string }[] = [
+  { id: 'cases', label: 'Case Reports', icon: BarChart3, color: 'text-blue-600 bg-blue-50' },
+  { id: 'financial', label: 'Financial Reports', icon: DollarSign, color: 'text-green-600 bg-green-50' },
+  { id: 'documents', label: 'Document Reports', icon: FileText, color: 'text-purple-600 bg-purple-50' },
+  { id: 'employees', label: 'Employee Reports', icon: Users, color: 'text-orange-600 bg-orange-50' },
+  { id: 'clients', label: 'Client Reports', icon: TrendingUp, color: 'text-pink-600 bg-pink-50' },
 ];
 
-const pieData = [
-  { name: 'NEW', value: mockCases.filter(c => c.status === 'NEW').length, color: '#3b82f6' },
-  { name: 'ONGOING', value: mockCases.filter(c => c.status === 'ONGOING').length, color: '#f97316' },
-  { name: 'COMPLETED', value: mockCases.filter(c => c.status === 'COMPLETED').length, color: '#22c55e' },
-  { name: 'ARCHIVED', value: mockCases.filter(c => c.status === 'ARCHIVED').length, color: '#9ca3af' },
-];
+const PRINT_STYLES = `
+  body { font-family: Arial, sans-serif; padding: 20px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
+  th { background: #1B2B6B; color: white; }
+  h1 { color: #1B2B6B; }
+  h2 { color: #1B2B6B; border-bottom: 2px solid #C9A227; padding-bottom: 5px; }
+  .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 3px solid #1B2B6B; padding-bottom: 15px; }
+  .firm-name { font-size: 20px; font-weight: bold; color: #1B2B6B; }
+  .firm-details { font-size: 11px; color: #666; }
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 15px 0; }
+  .stat-box { border: 1px solid #ddd; padding: 10px; text-align: center; border-radius: 4px; }
+  .stat-value { font-size: 24px; font-weight: bold; color: #1B2B6B; }
+  .stat-label { font-size: 11px; color: #666; }
+  @media print { button { display: none; } }
+`;
+
+function printReport(elementId: string) {
+  const content = document.getElementById(elementId);
+  if (!content) return;
+  const printWindow = window.open('', '_blank');
+  if (printWindow) {
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>MAIRA & ADHIS ADVOCATES - Report</title>
+          <style>${PRINT_STYLES}</style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <div class="firm-name">MAIRA &amp; ADHIS ADVOCATES</div>
+              <div class="firm-details">17 Usalama Drive, Drive-in Estate, Old Bagamoyo Road, Dar Es Salaam, Tanzania</div>
+              <div class="firm-details">Tel: +255 763 717 988 | Email: info@maca.co.tz</div>
+            </div>
+            <div class="firm-details">Generated: ${new Date().toLocaleDateString()}</div>
+          </div>
+          ${content.innerHTML}
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+  }
+}
+
+function printDocument(url: string) {
+  const printWindow = window.open(url, '_blank');
+  if (printWindow) {
+    printWindow.onload = () => { printWindow.print(); };
+  }
+}
+
+interface FirestoreCase {
+  id: string;
+  caseNumber: string;
+  title: string;
+  status: string;
+  category: string;
+  advocateName: string;
+  clientName: string;
+  filingDate: string;
+}
+
+interface FirestoreExpense {
+  id: string;
+  date: string;
+  category: string;
+  description: string;
+  amount: number;
+  approvedBy?: string;
+}
+
+interface IncomeRecord {
+  id: string;
+  date: string;
+  clientName: string;
+  description: string;
+  amount: number;
+  caseReference?: string;
+  status: string;
+}
+
+interface DocRecord {
+  id: string;
+  name: string;
+  category: string;
+  fileUrl: string;
+  fileType: string;
+  fileSize: number;
+  uploadedByName: string;
+  createdAt: string;
+}
 
 const ReportsPage: React.FC = () => {
-  const [selectedReport, setSelectedReport] = useState('cases');
+  const [activeTab, setActiveTab] = useState<TabId>('cases');
+  const [cases, setCases] = useState<FirestoreCase[]>([]);
+  const [expenses, setExpenses] = useState<FirestoreExpense[]>([]);
+  const [income, setIncome] = useState<IncomeRecord[]>([]);
+  const [documents, setDocuments] = useState<DocRecord[]>([]);
+  const [docCategoryFilter, setDocCategoryFilter] = useState('ALL');
+  const [loading, setLoading] = useState(true);
+
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
+    try {
+      // Cases
+      const casesSnap = await getDocs(query(collection(db, 'cases'), orderBy('createdAt', 'desc')));
+      if (casesSnap.docs.length > 0) {
+        setCases(casesSnap.docs.map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            caseNumber: data.caseNumber,
+            title: data.title,
+            status: data.status,
+            category: data.category,
+            advocateName: data.advocateName || '',
+            clientName: data.clientName || data.partiesNames?.plaintiff || '',
+            filingDate: data.filingDate?.toDate ? data.filingDate.toDate().toISOString() : String(data.filingDate),
+          };
+        }));
+      } else {
+        setCases(mockCases.map((c) => ({
+          id: c.id, caseNumber: c.caseNumber, title: c.title, status: c.status,
+          category: c.category, advocateName: c.advocateName, clientName: c.clientName,
+          filingDate: c.filingDate.toISOString(),
+        })));
+      }
+    } catch {
+      setCases(mockCases.map((c) => ({
+        id: c.id, caseNumber: c.caseNumber, title: c.title, status: c.status,
+        category: c.category, advocateName: c.advocateName, clientName: c.clientName,
+        filingDate: c.filingDate.toISOString(),
+      })));
+    }
+
+    try {
+      const expSnap = await getDocs(query(collection(db, 'expenses'), orderBy('createdAt', 'desc')));
+      if (expSnap.docs.length > 0) {
+        setExpenses(expSnap.docs.map((d) => {
+          const data = d.data();
+          return { id: d.id, date: data.date, category: data.category, description: data.description, amount: data.amount, approvedBy: data.approvedBy };
+        }));
+      } else {
+        setExpenses(mockExpenses.map((e) => ({
+          id: e.id,
+          date: e.date instanceof Date ? e.date.toISOString().split('T')[0] : String(e.date),
+          category: e.category, description: e.description, amount: e.amount, approvedBy: e.approvedBy,
+        })));
+      }
+    } catch {
+      setExpenses(mockExpenses.map((e) => ({
+        id: e.id,
+        date: e.date instanceof Date ? e.date.toISOString().split('T')[0] : String(e.date),
+        category: e.category, description: e.description, amount: e.amount, approvedBy: e.approvedBy,
+      })));
+    }
+
+    try {
+      const incSnap = await getDocs(query(collection(db, 'income'), orderBy('createdAt', 'desc')));
+      setIncome(incSnap.docs.map((d) => {
+        const data = d.data();
+        return { id: d.id, date: data.date, clientName: data.clientName, description: data.description, amount: data.amount, caseReference: data.caseReference, status: data.status };
+      }));
+    } catch { setIncome([]); }
+
+    try {
+      const docSnap = await getDocs(query(collection(db, 'documents'), orderBy('createdAt', 'desc')));
+      setDocuments(docSnap.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id, name: data.name, category: data.category, fileUrl: data.fileUrl,
+          fileType: data.fileType, fileSize: data.fileSize, uploadedByName: data.uploadedByName,
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : String(data.createdAt),
+        };
+      }));
+    } catch { setDocuments([]); }
+
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  // ─── Computed stats ────────────────────────────────────────────────────────
+  const totalIncome = income.reduce((s, i) => s + i.amount, 0);
+  const totalExpensesSum = expenses.reduce((s, e) => s + e.amount, 0);
+  const netBalance = totalIncome - totalExpensesSum;
+
+  const pieData = [
+    { name: 'NEW', value: cases.filter((c) => c.status === 'NEW').length, color: '#3b82f6' },
+    { name: 'ONGOING', value: cases.filter((c) => c.status === 'ONGOING').length, color: '#f97316' },
+    { name: 'COMPLETED', value: cases.filter((c) => c.status === 'COMPLETED').length, color: '#22c55e' },
+    { name: 'ARCHIVED', value: cases.filter((c) => c.status === 'ARCHIVED').length, color: '#9ca3af' },
+  ];
+
+  // Monthly income vs expenses chart data
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const financialChartData = months.map((month, idx) => {
+    const monthIncome = income.filter((i) => new Date(i.date).getMonth() === idx).reduce((s, i) => s + i.amount, 0);
+    const monthExpense = expenses.filter((e) => new Date(e.date).getMonth() === idx).reduce((s, e) => s + e.amount, 0);
+    return { month, income: monthIncome, expenses: monthExpense };
+  });
+
+  const filteredDocs = docCategoryFilter === 'ALL'
+    ? documents
+    : documents.filter((d) => d.category === docCategoryFilter);
+
+  const docCategories = ['ALL', ...Array.from(new Set(documents.map((d) => d.category)))];
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 gap-4">
+        <div className="w-10 h-10 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
+        <p className="text-gray-500">Loading reports...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-gray-900">Reports</h2>
-        <div className="flex gap-2">
-          <Button variant="outline" leftIcon={<Printer className="h-4 w-4" />}>Print</Button>
-          <Button variant="outline" leftIcon={<Download className="h-4 w-4" />}>Export CSV</Button>
-          <Button leftIcon={<Download className="h-4 w-4" />}>Export PDF</Button>
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900">Reports</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Generate and print reports for all departments</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {reportTypes.map(r => (
+      {/* Tab buttons */}
+      <div className="flex flex-wrap gap-2">
+        {TABS.map((tab) => (
           <button
-            key={r.id}
-            onClick={() => setSelectedReport(r.id)}
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
             className={clsx(
-              'bg-white rounded-xl border p-5 text-left transition-all',
-              selectedReport === r.id ? 'border-primary-600 shadow-md ring-1 ring-primary-600/20' : 'border-gray-200 hover:border-gray-300 shadow-card'
+              'flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all',
+              activeTab === tab.id
+                ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
+                : 'bg-white text-gray-600 border-gray-200 hover:border-primary-300'
             )}
           >
-            <div className={clsx('w-10 h-10 rounded-xl flex items-center justify-center mb-3', r.color)}>
-              <r.icon className="h-5 w-5" />
+            <div className={clsx('w-6 h-6 rounded-lg flex items-center justify-center', activeTab === tab.id ? 'bg-white/20' : tab.color)}>
+              <tab.icon className="h-3.5 w-3.5" />
             </div>
-            <p className="text-sm font-semibold text-gray-900">{r.label}</p>
+            {tab.label}
           </button>
         ))}
       </div>
 
-      {selectedReport === 'cases' && (
+      {/* ── CASE REPORTS ── */}
+      {activeTab === 'cases' && (
         <div className="space-y-5">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              { label: 'Total Cases', value: mockCases.length },
-              { label: 'Active (Ongoing)', value: mockCases.filter(c => c.status === 'ONGOING').length },
-              { label: 'Completed', value: mockCases.filter(c => c.status === 'COMPLETED').length },
-              { label: 'New', value: mockCases.filter(c => c.status === 'NEW').length },
-            ].map(stat => (
-              <div key={stat.label} className="bg-white rounded-xl border border-gray-200 p-4 text-center">
-                <p className="text-3xl font-bold text-primary-600">{stat.value}</p>
-                <p className="text-sm text-gray-500 mt-1">{stat.label}</p>
-              </div>
-            ))}
+          <div className="flex justify-end">
+            <button
+              onClick={() => printReport('case-report-content')}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50"
+            >
+              <Printer className="h-4 w-4" /> Print Report
+            </button>
           </div>
-          <div className="grid md:grid-cols-2 gap-5">
-            <div className="bg-white rounded-xl border border-gray-200 p-5">
-              <h3 className="text-base font-semibold text-gray-900 mb-4">Cases by Status</h3>
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={85} paddingAngle={3} dataKey="value">
-                    {pieData.map((entry, index) => <Cell key={index} fill={entry.color} />)}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
+          <div id="case-report-content" className="space-y-5">
+            <h2 className="text-lg font-semibold text-gray-900">Case Statistics Report</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                { label: 'Total Cases', value: cases.length },
+                { label: 'Active (Ongoing)', value: cases.filter((c) => c.status === 'ONGOING').length },
+                { label: 'Completed', value: cases.filter((c) => c.status === 'COMPLETED').length },
+                { label: 'New', value: cases.filter((c) => c.status === 'NEW').length },
+              ].map((stat) => (
+                <div key={stat.label} className="bg-white rounded-xl border border-gray-200 p-4 text-center">
+                  <p className="text-3xl font-bold text-primary-600">{stat.value}</p>
+                  <p className="text-sm text-gray-500 mt-1">{stat.label}</p>
+                </div>
+              ))}
+            </div>
+            <div className="grid md:grid-cols-2 gap-5">
+              <div className="bg-white rounded-xl border border-gray-200 p-5">
+                <h3 className="text-base font-semibold text-gray-900 mb-4">Cases by Status</h3>
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={85} paddingAngle={3} dataKey="value">
+                      {pieData.map((entry, index) => <Cell key={index} fill={entry.color} />)}
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="bg-white rounded-xl border border-gray-200 p-5">
+                <h3 className="text-base font-semibold text-gray-900 mb-4">Monthly Case Filings 2024</h3>
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={mockMonthlyStats}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 11 }} />
+                    <Tooltip />
+                    <Bar dataKey="cases" fill="#1B2B6B" radius={[3, 3, 0, 0]} name="Filed" />
+                    <Bar dataKey="completed" fill="#22c55e" radius={[3, 3, 0, 0]} name="Completed" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-100">
+                <h3 className="text-base font-semibold text-gray-900">All Cases</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b">
+                      <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Case No.</th>
+                      <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Title</th>
+                      <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase hidden md:table-cell">Client</th>
+                      <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase hidden lg:table-cell">Category</th>
+                      <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
+                      <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase hidden sm:table-cell">Filed</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {cases.map((c) => (
+                      <tr key={c.id} className="hover:bg-gray-50">
+                        <td className="px-5 py-3 font-mono text-xs text-gray-700">{c.caseNumber}</td>
+                        <td className="px-5 py-3 text-gray-900 font-medium max-w-[200px] truncate">{c.title}</td>
+                        <td className="px-5 py-3 text-gray-600 hidden md:table-cell">{c.clientName}</td>
+                        <td className="px-5 py-3 hidden lg:table-cell"><span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-md">{c.category}</span></td>
+                        <td className="px-5 py-3">
+                          <span className={clsx('text-xs px-2 py-1 rounded-full font-medium', {
+                            'bg-blue-100 text-blue-800': c.status === 'NEW',
+                            'bg-yellow-100 text-yellow-800': c.status === 'ONGOING',
+                            'bg-green-100 text-green-800': c.status === 'COMPLETED',
+                            'bg-gray-100 text-gray-800': c.status === 'ARCHIVED',
+                          })}>
+                            {c.status}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3 text-gray-500 text-xs hidden sm:table-cell">{formatDate(c.filingDate)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── FINANCIAL REPORTS ── */}
+      {activeTab === 'financial' && (
+        <div className="space-y-5">
+          <div className="flex justify-end">
+            <button
+              onClick={() => printReport('financial-report-content')}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50"
+            >
+              <Printer className="h-4 w-4" /> Print Report
+            </button>
+          </div>
+          <div id="financial-report-content" className="space-y-5">
+            <h2 className="text-lg font-semibold text-gray-900">Financial Report</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-white rounded-xl border border-green-200 p-4 text-center">
+                <p className="text-2xl font-bold text-green-600">{formatCurrency(totalIncome)}</p>
+                <p className="text-sm text-gray-500 mt-1">Total Income</p>
+              </div>
+              <div className="bg-white rounded-xl border border-red-200 p-4 text-center">
+                <p className="text-2xl font-bold text-red-600">{formatCurrency(totalExpensesSum)}</p>
+                <p className="text-sm text-gray-500 mt-1">Total Expenses</p>
+              </div>
+              <div className={clsx('bg-white rounded-xl border p-4 text-center', netBalance >= 0 ? 'border-blue-200' : 'border-orange-200')}>
+                <p className={clsx('text-2xl font-bold', netBalance >= 0 ? 'text-blue-600' : 'text-orange-600')}>{formatCurrency(netBalance)}</p>
+                <p className="text-sm text-gray-500 mt-1">Net Balance</p>
+              </div>
             </div>
             <div className="bg-white rounded-xl border border-gray-200 p-5">
-              <h3 className="text-base font-semibold text-gray-900 mb-4">Monthly Case Filings 2024</h3>
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={mockMonthlyStats}>
+              <h3 className="text-base font-semibold text-gray-900 mb-4">Monthly Income vs Expenses</h3>
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={financialChartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} />
-                  <Tooltip />
-                  <Bar dataKey="cases" fill="#1B2B6B" radius={[3,3,0,0]} name="Filed" />
-                  <Bar dataKey="completed" fill="#22c55e" radius={[3,3,0,0]} name="Completed" />
+                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${(v / 1000000).toFixed(0)}M`} />
+                  <Tooltip formatter={(v: number) => [formatCurrency(v), '']} />
+                  <Legend />
+                  <Bar dataKey="income" fill="#22c55e" radius={[3, 3, 0, 0]} name="Income" />
+                  <Bar dataKey="expenses" fill="#ef4444" radius={[3, 3, 0, 0]} name="Expenses" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <h3 className="text-base font-semibold text-gray-900 mb-4">Cases by Category</h3>
-            <div className="space-y-3">
-              {['Commercial & Corporate', 'Family Matters', 'Conveyances & Property', 'Labour Law', 'Criminal Defense'].map(cat => {
-                const count = mockCases.filter(c => c.category === cat).length;
-                const pct = Math.round((count / mockCases.length) * 100);
-                return (
-                  <div key={cat} className="flex items-center gap-3">
-                    <span className="text-sm text-gray-600 w-44 flex-shrink-0">{cat}</span>
-                    <div className="flex-1 bg-gray-200 rounded-full h-2">
-                      <div className="bg-primary-600 h-2 rounded-full" style={{ width: `${pct || 5}%` }} />
-                    </div>
-                    <span className="text-sm font-medium text-gray-700 w-6 text-right">{count}</span>
-                  </div>
-                );
-              })}
+            <div className="grid md:grid-cols-2 gap-5">
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="px-5 py-4 border-b border-gray-100">
+                  <h3 className="text-base font-semibold text-gray-900">Expenses ({expenses.length})</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 border-b">
+                        <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Date</th>
+                        <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Category</th>
+                        <th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {expenses.map((e) => (
+                        <tr key={e.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-2.5 text-xs text-gray-600">{formatDate(e.date)}</td>
+                          <td className="px-4 py-2.5 text-xs text-gray-700">{e.category}</td>
+                          <td className="px-4 py-2.5 text-xs text-right font-semibold text-red-700">{e.amount.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                      <tr className="bg-gray-50 border-t-2">
+                        <td colSpan={2} className="px-4 py-2.5 text-xs font-bold">Total</td>
+                        <td className="px-4 py-2.5 text-xs text-right font-bold text-red-700">{totalExpensesSum.toLocaleString()}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="px-5 py-4 border-b border-gray-100">
+                  <h3 className="text-base font-semibold text-gray-900">Income ({income.length})</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 border-b">
+                        <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Date</th>
+                        <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Client</th>
+                        <th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {income.length === 0 ? (
+                        <tr><td colSpan={3} className="px-4 py-6 text-center text-gray-400 text-sm">No income records yet</td></tr>
+                      ) : income.map((i) => (
+                        <tr key={i.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-2.5 text-xs text-gray-600">{formatDate(i.date)}</td>
+                          <td className="px-4 py-2.5 text-xs text-gray-700 truncate max-w-[120px]">{i.clientName}</td>
+                          <td className="px-4 py-2.5 text-xs text-right font-semibold text-green-700">{i.amount.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                      {income.length > 0 && (
+                        <tr className="bg-gray-50 border-t-2">
+                          <td colSpan={2} className="px-4 py-2.5 text-xs font-bold">Total</td>
+                          <td className="px-4 py-2.5 text-xs text-right font-bold text-green-700">{totalIncome.toLocaleString()}</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {selectedReport === 'financial' && (
+      {/* ── DOCUMENT REPORTS ── */}
+      {activeTab === 'documents' && (
         <div className="space-y-5">
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <h3 className="text-base font-semibold text-gray-900 mb-4">Monthly Expenditure</h3>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={mockExpensesByMonth}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} tickFormatter={v => `${(v/1000000).toFixed(0)}M`} />
-                <Tooltip formatter={(v: number) => [`TZS ${v.toLocaleString()}`, 'Expenses']} />
-                <Bar dataKey="amount" fill="#1B2B6B" radius={[4,4,0,0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex flex-wrap gap-2">
+              {docCategories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setDocCategoryFilter(cat)}
+                  className={clsx(
+                    'px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors',
+                    docCategoryFilter === cat ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-gray-600 border-gray-200 hover:border-primary-300'
+                  )}
+                >
+                  {cat}
+                  <span className="ml-1 opacity-70">({cat === 'ALL' ? documents.length : documents.filter((d) => d.category === cat).length})</span>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => printReport('document-report-content')}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50"
+            >
+              <Printer className="h-4 w-4" /> Print All Documents List
+            </button>
           </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <h3 className="text-base font-semibold text-gray-900 mb-4">Expense Breakdown</h3>
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  {['Category', 'Amount (TZS)', '% of Total'].map(h => (
-                    <th key={h} className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {mockExpenses.map(e => (
-                  <tr key={e.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium">{e.category}</td>
-                    <td className="px-4 py-3">{e.amount.toLocaleString()}</td>
-                    <td className="px-4 py-3">{((e.amount / mockExpenses.reduce((s, ex) => s + ex.amount, 0)) * 100).toFixed(1)}%</td>
-                  </tr>
-                ))}
-                <tr className="bg-gray-50 font-bold">
-                  <td className="px-4 py-3">Total</td>
-                  <td className="px-4 py-3 text-primary-700">{mockExpenses.reduce((s, e) => s + e.amount, 0).toLocaleString()}</td>
-                  <td className="px-4 py-3">100%</td>
-                </tr>
-              </tbody>
-            </table>
+          <div id="document-report-content">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Document Report</h2>
+            {filteredDocs.length === 0 ? (
+              <div className="bg-white rounded-xl border border-gray-200 py-12 text-center">
+                <FileText className="h-10 w-10 text-gray-300 mx-auto mb-2" />
+                <p className="text-gray-500">No documents found</p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 border-b">
+                        <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Name</th>
+                        <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Category</th>
+                        <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase hidden md:table-cell">Uploaded By</th>
+                        <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase hidden sm:table-cell">Upload Date</th>
+                        <th className="px-5 py-3 text-right text-xs font-semibold text-gray-500 uppercase hidden lg:table-cell">Size</th>
+                        <th className="px-5 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {filteredDocs.map((d) => (
+                        <tr key={d.id} className="hover:bg-gray-50">
+                          <td className="px-5 py-3 text-gray-900 font-medium max-w-[200px] truncate" title={d.name}>{d.name}</td>
+                          <td className="px-5 py-3">
+                            <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full font-medium">{d.category}</span>
+                          </td>
+                          <td className="px-5 py-3 text-gray-600 hidden md:table-cell text-xs">{d.uploadedByName}</td>
+                          <td className="px-5 py-3 text-gray-500 text-xs hidden sm:table-cell">{formatDate(d.createdAt)}</td>
+                          <td className="px-5 py-3 text-right text-gray-500 text-xs hidden lg:table-cell">
+                            {d.fileSize ? `${(d.fileSize / 1024).toFixed(0)} KB` : '—'}
+                          </td>
+                          <td className="px-5 py-3">
+                            <div className="flex items-center justify-center gap-1">
+                              {d.fileUrl && d.fileUrl !== '#' && (
+                                <>
+                                  <button onClick={() => window.open(d.fileUrl, '_blank')} className="inline-flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 font-medium px-2 py-1 rounded hover:bg-primary-50">
+                                    <Eye className="h-3.5 w-3.5" /> View
+                                  </button>
+                                  <button onClick={() => printDocument(d.fileUrl)} className="inline-flex items-center gap-1 text-xs text-gray-600 hover:text-gray-700 font-medium px-2 py-1 rounded hover:bg-gray-100">
+                                    <Printer className="h-3.5 w-3.5" /> Print
+                                  </button>
+                                  <a href={d.fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-gray-600 hover:text-gray-700 font-medium px-2 py-1 rounded hover:bg-gray-100">
+                                    <Download className="h-3.5 w-3.5" /> Download
+                                  </a>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {selectedReport === 'clients' && (
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <div className="grid md:grid-cols-3 gap-4 mb-6">
-            {[
-              { label: 'Total Clients', value: mockClients.length },
-              { label: 'Individual', value: mockClients.filter(c => c.clientType === 'INDIVIDUAL').length },
-              { label: 'Corporate', value: mockClients.filter(c => c.clientType === 'CORPORATE').length },
-            ].map(stat => (
-              <div key={stat.label} className="text-center p-4 bg-gray-50 rounded-xl">
-                <p className="text-3xl font-bold text-primary-600">{stat.value}</p>
-                <p className="text-sm text-gray-500">{stat.label}</p>
-              </div>
-            ))}
+      {/* ── EMPLOYEE REPORTS ── */}
+      {activeTab === 'employees' && (
+        <div className="space-y-5">
+          <div className="flex justify-end">
+            <button
+              onClick={() => printReport('employee-report-content')}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50"
+            >
+              <Printer className="h-4 w-4" /> Print Report
+            </button>
           </div>
-          <table className="w-full text-sm">
-            <thead className="border-b">
-              <tr>
-                {['Client Name', 'Type', 'Contact', 'Cases'].map(h => (
-                  <th key={h} className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {mockClients.map(c => (
-                <tr key={c.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium text-gray-900">{c.fullName}</td>
-                  <td className="px-4 py-3 text-gray-600">{c.clientType}</td>
-                  <td className="px-4 py-3 text-gray-600 text-xs">{c.phone}</td>
-                  <td className="px-4 py-3 text-gray-600">{c.cases.length}</td>
-                </tr>
+          <div id="employee-report-content">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Employee Report</h2>
+            <div className="grid md:grid-cols-3 gap-4 mb-5">
+              {[
+                { label: 'Total Staff', value: mockEmployees.length },
+                { label: 'Legal Department', value: mockEmployees.filter((e) => e.department === 'Legal').length },
+                { label: 'Admin/Finance', value: mockEmployees.filter((e) => e.department !== 'Legal').length },
+              ].map((stat) => (
+                <div key={stat.label} className="bg-white rounded-xl border border-gray-200 p-4 text-center">
+                  <p className="text-3xl font-bold text-primary-600">{stat.value}</p>
+                  <p className="text-sm text-gray-500">{stat.label}</p>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b">
+                      {['Name', 'Position', 'Department', 'Email', 'Phone', 'Status', 'Leave Balance'].map((h) => (
+                        <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {mockEmployees.map((e) => (
+                      <tr key={e.id} className="hover:bg-gray-50">
+                        <td className="px-5 py-3 font-medium text-gray-900">{e.fullName}</td>
+                        <td className="px-5 py-3 text-gray-600">{e.position}</td>
+                        <td className="px-5 py-3 text-gray-600">{e.department}</td>
+                        <td className="px-5 py-3 text-gray-500 text-xs">{e.email}</td>
+                        <td className="px-5 py-3 text-gray-500 text-xs">{e.phone}</td>
+                        <td className="px-5 py-3">
+                          <span className={clsx('text-xs px-2 py-0.5 rounded-full font-medium', e.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600')}>
+                            {e.status}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3 text-gray-600">{e.leaveBalance} days</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
-      {selectedReport === 'employees' && (
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <div className="grid md:grid-cols-3 gap-4 mb-6">
-            {[
-              { label: 'Total Staff', value: mockEmployees.length },
-              { label: 'Legal Department', value: mockEmployees.filter(e => e.department === 'Legal').length },
-              { label: 'Admin/Finance', value: mockEmployees.filter(e => e.department !== 'Legal').length },
-            ].map(stat => (
-              <div key={stat.label} className="text-center p-4 bg-gray-50 rounded-xl">
-                <p className="text-3xl font-bold text-primary-600">{stat.value}</p>
-                <p className="text-sm text-gray-500">{stat.label}</p>
-              </div>
-            ))}
+      {/* ── CLIENT REPORTS ── */}
+      {activeTab === 'clients' && (
+        <div className="space-y-5">
+          <div className="flex justify-end">
+            <button
+              onClick={() => printReport('client-report-content')}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50"
+            >
+              <Printer className="h-4 w-4" /> Print Report
+            </button>
           </div>
-          <table className="w-full text-sm">
-            <thead className="border-b">
-              <tr>
-                {['Name', 'Position', 'Department', 'Status', 'Leave Balance'].map(h => (
-                  <th key={h} className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {mockEmployees.map(e => (
-                <tr key={e.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium text-gray-900">{e.fullName}</td>
-                  <td className="px-4 py-3 text-gray-600">{e.position}</td>
-                  <td className="px-4 py-3 text-gray-600">{e.department}</td>
-                  <td className="px-4 py-3"><span className={clsx('px-2 py-0.5 rounded-full text-xs font-medium', e.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600')}>{e.status}</span></td>
-                  <td className="px-4 py-3 text-gray-600">{e.leaveBalance} days</td>
-                </tr>
+          <div id="client-report-content">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Client Report</h2>
+            <div className="grid md:grid-cols-3 gap-4 mb-5">
+              {[
+                { label: 'Total Clients', value: mockClients.length },
+                { label: 'Individual', value: mockClients.filter((c) => c.clientType === 'INDIVIDUAL').length },
+                { label: 'Corporate', value: mockClients.filter((c) => c.clientType === 'CORPORATE').length },
+              ].map((stat) => (
+                <div key={stat.label} className="bg-white rounded-xl border border-gray-200 p-4 text-center">
+                  <p className="text-3xl font-bold text-primary-600">{stat.value}</p>
+                  <p className="text-sm text-gray-500">{stat.label}</p>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b">
+                      {['Client Name', 'Type', 'Phone', 'Email', 'Address', 'Cases'].map((h) => (
+                        <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {mockClients.map((c) => (
+                      <tr key={c.id} className="hover:bg-gray-50">
+                        <td className="px-5 py-3 font-medium text-gray-900">{c.fullName}</td>
+                        <td className="px-5 py-3">
+                          <span className={clsx('text-xs px-2 py-0.5 rounded-full font-medium', c.clientType === 'CORPORATE' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700')}>
+                            {c.clientType}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3 text-gray-500 text-xs">{c.phone}</td>
+                        <td className="px-5 py-3 text-gray-500 text-xs">{c.email}</td>
+                        <td className="px-5 py-3 text-gray-500 text-xs max-w-[160px] truncate">{c.address}</td>
+                        <td className="px-5 py-3 text-gray-600 font-medium">{c.cases.length}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

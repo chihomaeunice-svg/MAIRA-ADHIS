@@ -374,33 +374,36 @@ const DocumentsPage: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-1 mt-4 pt-3 border-t border-gray-100 flex-wrap">
-                {isViewable(docItem.fileType) && docItem.fileUrl !== '#' && (
-                  <button
-                    onClick={() => setViewDoc(docItem)}
-                    className="flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-                  >
-                    <Eye className="h-3.5 w-3.5" />
-                    View
-                  </button>
-                )}
-                {docItem.fileUrl !== '#' && (
-                  <button
-                    onClick={() => window.open(docItem.fileUrl, '_blank')}
-                    className="flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                    Download
-                  </button>
-                )}
-                {docItem.fileUrl !== '#' && (
-                  <button
-                    onClick={() => printDocument(docItem.fileUrl, docItem.name)}
-                    className="flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    <Printer className="h-3.5 w-3.5" />
-                    Print
-                  </button>
-                )}
+                <button
+                  onClick={() => {
+                    if (docItem.fileUrl === '#') { toast.error('No file available — upload a real file to view it'); return; }
+                    setViewDoc(docItem);
+                  }}
+                  className="flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                  View
+                </button>
+                <button
+                  onClick={() => {
+                    if (docItem.fileUrl === '#') { toast.error('No file available — upload a real file to download it'); return; }
+                    window.open(docItem.fileUrl, '_blank');
+                  }}
+                  className="flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Download
+                </button>
+                <button
+                  onClick={() => {
+                    if (docItem.fileUrl === '#') { toast.error('No file available — upload a real file to print it'); return; }
+                    printDocument(docItem.fileUrl, docItem.name);
+                  }}
+                  className="flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <Printer className="h-3.5 w-3.5" />
+                  Print
+                </button>
                 {isAdmin && (
                   <button
                     onClick={() => handleDelete(docItem)}
