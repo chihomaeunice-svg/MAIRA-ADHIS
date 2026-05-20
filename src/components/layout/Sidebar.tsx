@@ -3,15 +3,20 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
 import {
   LayoutDashboard, Briefcase, Users, FileText, Mail, ShoppingCart,
-  UserCog, Calendar, BarChart3, Settings, LogOut, Scale, ChevronLeft, ChevronRight, Globe,
+  UserCog, Calendar, BarChart3, Settings, LogOut, Scale,
+  ChevronLeft, ChevronRight, Globe, UserCog2,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { useUIStore } from '@/stores/uiStore';
+import { useAuth } from '@/hooks/useAuth';
+import { canAccess } from '@/lib/permissions';
+import { UserRole } from '@/types';
 
 interface NavItem {
   label: string;
   path: string;
   icon: React.ComponentType<{ className?: string }>;
+  permission: string;
 }
 
 interface NavSection {
@@ -23,49 +28,61 @@ const navSections: NavSection[] = [
   {
     title: 'MAIN',
     items: [
-      { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+      { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, permission: 'dashboard' },
     ],
   },
   {
     title: 'CASE MANAGEMENT',
     items: [
-      { label: 'Cases', path: '/cases', icon: Briefcase },
-      { label: 'Clients', path: '/clients', icon: Users },
+      { label: 'Cases', path: '/cases', icon: Briefcase, permission: 'cases' },
+      { label: 'Clients', path: '/clients', icon: Users, permission: 'clients' },
     ],
   },
   {
     title: 'ADMINISTRATION',
     items: [
-      { label: 'Documents', path: '/documents', icon: FileText },
-      { label: 'Correspondence', path: '/correspondence', icon: Mail },
-      { label: 'Procurement', path: '/procurement', icon: ShoppingCart },
-      { label: 'Employees', path: '/employees', icon: UserCog },
+      { label: 'Documents', path: '/documents', icon: FileText, permission: 'documents' },
+      { label: 'Correspondence', path: '/correspondence', icon: Mail, permission: 'correspondence' },
+      { label: 'Procurement', path: '/procurement', icon: ShoppingCart, permission: 'procurement' },
+      { label: 'Employees', path: '/employees', icon: UserCog, permission: 'employees' },
     ],
   },
   {
     title: 'TOOLS',
     items: [
-      { label: 'Calendar', path: '/calendar', icon: Calendar },
-      { label: 'Reports', path: '/reports', icon: BarChart3 },
+      { label: 'Calendar', path: '/calendar', icon: Calendar, permission: 'calendar' },
+      { label: 'Reports', path: '/reports', icon: BarChart3, permission: 'reports' },
     ],
   },
   {
     title: 'SYSTEM',
     items: [
-      { label: 'Settings', path: '/settings', icon: Settings },
+      { label: 'Settings', path: '/settings', icon: Settings, permission: 'settings' },
+      { label: 'User Management', path: '/users', icon: UserCog2, permission: 'users' },
     ],
   },
 ];
 
 const Sidebar: React.FC = () => {
-  const { user, logout } = useAuthStore();
+  const { user } = useAuthStore();
   const { sidebarOpen, toggleSidebar } = useUIStore();
+  const { logout } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate('/login');
   };
+
+  const userRole = user?.role as UserRole | undefined;
+
+  // Filter nav sections by the user's role permissions
+  const visibleSections = navSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => canAccess(userRole, item.permission)),
+    }))
+    .filter((section) => section.items.length > 0);
 
   return (
     <aside
@@ -106,7 +123,7 @@ const Sidebar: React.FC = () => {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-4 space-y-5">
-        {navSections.map((section) => (
+        {visibleSections.map((section) => (
           <div key={section.title}>
             {sidebarOpen && (
               <p className="px-4 mb-2 text-[10px] font-semibold text-primary-300 tracking-widest uppercase">
@@ -187,7 +204,7 @@ const Sidebar: React.FC = () => {
           {sidebarOpen && (
             <div className="flex-1 min-w-0">
               <p className="text-white text-sm font-medium truncate">{user?.name || 'User'}</p>
-              <p className="text-primary-300 text-xs truncate">{user?.role?.replace('_', ' ') || 'ADVOCATE'}</p>
+              <p className="text-primary-300 text-xs truncate">{user?.role?.replace(/_/g, ' ') || 'EMPLOYEE'}</p>
             </div>
           )}
           <button

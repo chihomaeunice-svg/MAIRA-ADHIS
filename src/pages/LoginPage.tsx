@@ -1,21 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Scale, Eye, EyeOff, Lock, Mail, AlertCircle, ArrowLeft } from 'lucide-react';
-import { useAuthStore } from '@/stores/authStore';
-import { User } from '@/types';
-import toast from 'react-hot-toast';
-
-const DEMO_ACCOUNTS = [
-  { email: 'admin@maira-adhis.com', password: 'admin123', role: 'ADMIN', name: 'System Administrator' },
-  { email: 'partner@maira-adhis.com', password: 'partner123', role: 'MANAGING_PARTNER', name: 'Adv. Maira Hassan' },
-  { email: 'advocate@maira-adhis.com', password: 'advocate123', role: 'ADVOCATE', name: 'Adv. Adhis Nkrumah' },
-  { email: 'secretary@maira-adhis.com', password: 'secretary123', role: 'SECRETARY', name: 'Florence Kamau' },
-  { email: 'accounts@maira-adhis.com', password: 'accounts123', role: 'ACCOUNTANT', name: 'Robert Osei' },
-];
+import { useAuth } from '@/hooks/useAuth';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { setUser } = useAuthStore();
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -26,33 +16,25 @@ const LoginPage: React.FC = () => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
-
-    await new Promise((r) => setTimeout(r, 600));
-
-    const account = DEMO_ACCOUNTS.find(
-      (a) => a.email === email && a.password === password
-    );
-
-    if (account) {
-      const user: User = {
-        id: `user-${account.role.toLowerCase()}`,
-        name: account.name,
-        email: account.email,
-        role: account.role as User['role'],
-        createdAt: new Date(),
-      };
-      setUser(user);
-      toast.success(`Welcome back, ${account.name}!`);
+    try {
+      await login(email, password);
       navigate('/dashboard');
-    } else {
-      setError('Invalid email or password. Please check your credentials and try again.');
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code;
+      if (code === 'auth/user-not-found' || code === 'auth/invalid-credential') {
+        setError('No account found with this email address.');
+      } else if (code === 'auth/wrong-password') {
+        setError('Incorrect password. Please try again.');
+      } else if (code === 'auth/too-many-requests') {
+        setError('Too many failed attempts. Please try again later.');
+      } else if (code === 'auth/user-disabled') {
+        setError('This account has been disabled. Contact your administrator.');
+      } else {
+        setError((err as Error).message || 'Sign in failed. Please try again.');
+      }
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
-  };
-
-  const handleDemoLogin = (account: typeof DEMO_ACCOUNTS[0]) => {
-    setEmail(account.email);
-    setPassword(account.password);
   };
 
   return (
@@ -101,7 +83,7 @@ const LoginPage: React.FC = () => {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
+                  placeholder="your.name@maca.co.tz"
                   className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
                 />
               </div>
@@ -147,29 +129,19 @@ const LoginPage: React.FC = () => {
             </button>
           </form>
 
-          {/* Demo Accounts */}
-          <div className="mt-6 pt-5 border-t border-gray-100">
-            <p className="text-xs text-gray-500 font-medium mb-3 text-center">QUICK ACCESS - DEMO ACCOUNTS</p>
-            <div className="grid grid-cols-1 gap-1.5">
-              {DEMO_ACCOUNTS.map((account) => (
-                <button
-                  key={account.email}
-                  type="button"
-                  onClick={() => handleDemoLogin(account)}
-                  className="flex items-center justify-between px-3 py-2 text-xs bg-gray-50 hover:bg-primary-50 border border-gray-200 hover:border-primary-200 rounded-lg transition-colors group"
-                >
-                  <span className="font-medium text-gray-700 group-hover:text-primary-700">{account.name}</span>
-                  <span className="text-gray-400 group-hover:text-primary-500 bg-white px-2 py-0.5 rounded border border-gray-200 group-hover:border-primary-200">
-                    {account.role.replace('_', ' ')}
-                  </span>
-                </button>
-              ))}
-            </div>
+          <div className="mt-6 pt-5 border-t border-gray-100 text-center">
+            <p className="text-sm text-gray-500">
+              Don&apos;t have an account?{' '}
+              <span className="text-primary-600 font-medium">Contact your administrator.</span>
+            </p>
           </div>
         </div>
 
         <div className="text-center mt-6 space-y-2">
-          <Link to="/" className="inline-flex items-center gap-1.5 text-primary-300 hover:text-white text-sm transition-colors">
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1.5 text-primary-300 hover:text-white text-sm transition-colors"
+          >
             <ArrowLeft className="h-3.5 w-3.5" /> Back to Main Website
           </Link>
           <p className="text-primary-400 text-xs">
