@@ -4,7 +4,7 @@ import {
   TrendingUp, TrendingDown, DollarSign, X, Trash2, Receipt,
 } from 'lucide-react';
 import {
-  collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, Timestamp,
+  collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, Timestamp, updateDoc,
 } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { useStorage } from '@/hooks/useStorage';
@@ -92,7 +92,8 @@ const ProcurementPage: React.FC = () => {
   });
 
   // Procurement
-  const [procurements] = useState<Procurement[]>(mockProcurement);
+  const [procurements, setProcurements] = useState<Procurement[]>(mockProcurement);
+  const [loadingProc, setLoadingProc] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<ProcurementStatus | 'ALL'>('ALL');
   const [showProcModal, setShowProcModal] = useState(false);
@@ -177,7 +178,38 @@ const ProcurementPage: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => { fetchExpenses(); fetchIncome(); }, [fetchExpenses, fetchIncome]);
+  const fetchProcurements = useCallback(async () => {
+    setLoadingProc(true);
+    try {
+      const q = query(collection(db, 'procurement'), orderBy('createdAt', 'desc'));
+      const snap = await getDocs(q);
+      if (snap.docs.length > 0) {
+        setProcurements(snap.docs.map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            itemName: data.itemName,
+            quantity: data.quantity,
+            unitPrice: data.unitPrice,
+            totalPrice: data.totalPrice,
+            supplier: data.supplier || '',
+            status: data.status,
+            requestedBy: data.requestedBy || '',
+            approvedBy: data.approvedBy || undefined,
+            date: data.date ? new Date(data.date) : new Date(),
+          };
+        }));
+      } else {
+        setProcurements(mockProcurement);
+      }
+    } catch {
+      setProcurements(mockProcurement);
+    } finally {
+      setLoadingProc(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchExpenses(); fetchIncome(); fetchProcurements(); }, [fetchExpenses, fetchIncome, fetchProcurements]);
 
   // ─── Monthly Totals ────────────────────────────────────────────────────────
   const thisMonth = new Date().getMonth();
@@ -298,11 +330,32 @@ const ProcurementPage: React.FC = () => {
       toast.success('Purchase request submitted');
       setShowProcModal(false);
       setProcForm({ itemName: '', quantity: '1', unitPrice: '', supplier: '' });
+      fetchProcurements();
     } catch (err) {
       console.error(err);
       toast.error('Failed to submit request');
     } finally {
       setSavingProc(false);
+    }
+  };
+
+  // ─── Approve / Reject Procurement ─────────────────────────────────────────
+  const handleApproveReject = async (id: string, newStatus: 'APPROVED' | 'REJECTED') => {
+    // mock data IDs start with 'proc-' — cannot be updated in Firestore
+    if (id.startsWith('proc-')) {
+      toast.error('Cannot update demo data. Submit a real procurement request first.');
+      return;
+    }
+    try {
+      await updateDoc(doc(db, 'procurement', id), {
+        status: newStatus,
+        approvedBy: user?.name || 'Unknown',
+      });
+      toast.success(`Request ${newStatus.toLowerCase()}`);
+      fetchProcurements();
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to update request');
     }
   };
 
@@ -555,7 +608,12 @@ const ProcurementPage: React.FC = () => {
             </div>
           </div>
           <div className="bg-white rounded-xl border border-gray-200 shadow-card overflow-hidden">
-            {filteredProc.length === 0 ? (
+            {loadingProc ? (
+              <div className="py-12 flex flex-col items-center gap-3">
+                <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
+                <p className="text-gray-500 text-sm">Loading procurement records...</p>
+              </div>
+            ) : filteredProc.length === 0 ? (
               <div className="py-12 text-center">
                 <Package className="h-10 w-10 text-gray-300 mx-auto mb-2" />
                 <p className="text-gray-500">No procurement records found</p>
@@ -594,11 +652,28 @@ const ProcurementPage: React.FC = () => {
                         <td className="px-5 py-3.5"><span className={clsx('text-xs px-2.5 py-1 rounded-full font-medium', getStatusColor(p.status))}>{p.status}</span></td>
                         <td className="px-5 py-3.5 hidden lg:table-cell"><span className="text-sm text-gray-500">{formatDate(p.date)}</span></td>
                         <td className="px-5 py-3.5">
-                          {p.status === 'PENDING' && (
+                          {p.status === 'PENDING' && isAdmin && (
                             <div className="flex gap-1">
-                              <button className="p-1 rounded text-green-600 hover:bg-green-50" title="Approve"><CheckCircle2 className="h-4 w-4" /></button>
-                              <button className="p-1 rounded text-red-600 hover:bg-red-50" title="Reject"><XCircle className="h-4 w-4" /></button>
+                              <button
+                                onClick={() => handleApproveReject(p.id, 'APPROVED')}
+                                className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 transition-colors"
+                                title="Approve"
+                              >
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => handleApproveReject(p.id, 'REJECTED')}
+                                className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 transition-colors"
+                                title="Reject"
+                              >
+                                <XCircle className="h-3.5 w-3.5" />
+                                Reject
+                              </button>
                             </div>
+                          )}
+                          {p.status !== 'PENDING' && p.approvedBy && (
+                            <span className="text-xs text-gray-400">By: {p.approvedBy}</span>
                           )}
                         </td>
                       </tr>
