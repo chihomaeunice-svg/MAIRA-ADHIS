@@ -25,7 +25,7 @@ const LOCAL_STAFF: Record<string, { password: string; name: string; role: UserRo
 };
 
 export function useAuth() {
-  const { setUser, logout: storeLogout, setLoading } = useAuthStore();
+  const { setUser, logout: storeLogout, setLoading, isLocalSession } = useAuthStore();
   const [initializing, setInitializing] = useState(true);
 
   const fetchUserProfile = async (firebaseUser: FirebaseUser): Promise<FirestoreUser | null> => {
@@ -78,6 +78,7 @@ export function useAuth() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
+        // Real Firebase session — fetch profile from Firestore
         const profile = await fetchUserProfile(firebaseUser);
         if (profile) {
           setUser({
@@ -88,10 +89,13 @@ export function useAuth() {
             phone: profile.phone,
             avatar: profile.avatar,
             createdAt: profile.createdAt,
-          });
+          }, false);
         }
       } else {
-        storeLogout();
+        // No Firebase session — but keep local-only sessions alive
+        if (!isLocalSession) {
+          storeLogout();
+        }
       }
       setLoading(false);
       setInitializing(false);
@@ -117,13 +121,14 @@ export function useAuth() {
         const code = (firebaseErr as { code?: string })?.code;
         // If Firebase account doesn't exist yet, log in locally (no Firebase session)
         if (code === 'auth/user-not-found' || code === 'auth/invalid-credential' || code === 'auth/invalid-email') {
+          // Firebase account not created yet — use local session
           setUser({
             id: `local-${email}`,
             name: local.name,
             email,
             role: local.role,
             createdAt: new Date(),
-          });
+          }, true); // true = local session, won't be wiped by onAuthStateChanged
           setLoading(false);
           toast.success(`Welcome, ${local.name}!`);
           return null;
