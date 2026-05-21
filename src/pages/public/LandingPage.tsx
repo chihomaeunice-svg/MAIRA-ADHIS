@@ -16,9 +16,9 @@ const practiceAreas = [
 ];
 
 const testimonials = [
-  { initials: 'J.K.', name: 'J. Kimaro', role: 'Business Owner', text: 'MAIRA & ADHIS handled our complex corporate dispute with utmost professionalism. Their expertise in commercial law is unmatched in Dar es Salaam.' },
+  { initials: 'J.K.', name: 'J. Kimaro', role: 'Business Owner', text: 'MAIRA & ADHIS COMPANY ADVOCATES handled our complex corporate dispute with utmost professionalism. Their expertise in commercial law is unmatched in Dar es Salaam.' },
   { initials: 'G.O.', name: 'G. Odhiambo', role: 'Individual Client', text: 'The team guided me through a difficult estate matter with compassion and efficiency. I felt supported every step of the way.' },
-  { initials: 'T.L.', name: 'Tanzaprint Ltd', role: 'Corporate Client', text: 'We have relied on MAIRA & ADHIS for all our legal needs for over 5 years. Their deep understanding of Tanzanian law is invaluable.' },
+  { initials: 'T.L.', name: 'Tanzaprint Ltd', role: 'Corporate Client', text: 'We have relied on MAIRA & ADHIS COMPANY ADVOCATES for all our legal needs for over 5 years. Their deep understanding of Tanzanian law is invaluable.' },
 ];
 
 const features = [
@@ -45,12 +45,10 @@ const LandingPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-accent-500 rounded-lg flex items-center justify-center">
-                <Scale className="h-5 w-5 text-white" />
-              </div>
+              <img src="/logo-icon.png" alt="Maira & Adhis" className="w-9 h-9 object-contain rounded-lg" onError={(e) => { (e.target as HTMLImageElement).style.display='none'; }} />
               <div>
                 <p className="text-white font-bold text-sm leading-tight">MAIRA &amp; ADHIS</p>
-                <p className="text-primary-200 text-xs">ADVOCATES</p>
+                <p className="text-primary-200 text-xs">COMPANY ADVOCATES</p>
               </div>
             </div>
             <div className="hidden md:flex items-center gap-6">
@@ -96,7 +94,7 @@ const LandingPage: React.FC = () => {
             </div>
             <h1 className="text-5xl lg:text-6xl font-bold text-white leading-tight mb-6">
               MAIRA &amp; ADHIS<br />
-              <span className="text-accent-400">ADVOCATES</span>
+              <span className="text-accent-400">COMPANY ADVOCATES</span>
             </h1>
             <p className="text-primary-100 text-lg leading-relaxed mb-8 max-w-xl">
               Advocates, Chartered Secretaries, Legal Consultants in Commercial &amp; Corporate Disputes, Conveyances, Family Matters, Labour, Notary Public &amp; Commissioners for Oaths.
@@ -192,7 +190,7 @@ const LandingPage: React.FC = () => {
               <p className="text-accent-600 font-semibold text-sm uppercase tracking-widest mb-2">About Us</p>
               <h2 className="text-4xl font-bold text-gray-900 mb-6">Serving Tanzanians With Excellence Since 2005</h2>
               <p className="text-gray-600 leading-relaxed mb-4">
-                MAIRA &amp; ADHIS ADVOCATES is a premier law firm headquartered in Dar es Salaam, Tanzania. We specialize in providing expert legal counsel to individuals, businesses, and organizations across a wide range of legal matters.
+                MAIRA &amp; ADHIS COMPANY ADVOCATES is a premier law firm headquartered in Dar es Salaam, Tanzania. We specialize in providing expert legal counsel to individuals, businesses, and organizations across a wide range of legal matters.
               </p>
               <p className="text-gray-600 leading-relaxed mb-6">
                 Our team of qualified advocates and chartered secretaries brings decades of combined experience in Tanzanian law, ensuring that our clients receive the highest quality legal representation in courts at all levels.
@@ -210,17 +208,17 @@ const LandingPage: React.FC = () => {
             </div>
             <div className="relative">
               <div className="bg-gradient-to-br from-primary-600 to-primary-800 rounded-2xl p-8 text-white">
-                <Scale className="h-20 w-20 text-accent-400 mb-6 mx-auto" />
+                <img src="/logo-icon.png" alt="Maira &amp; Adhis" className="h-20 w-20 object-contain mb-6 mx-auto" />
                 <h3 className="text-2xl font-bold text-center mb-4">Legal Excellence</h3>
                 <p className="text-primary-200 text-center leading-relaxed">
                   Committed to upholding justice and providing our clients with the best legal representation in Tanzania.
                 </p>
                 <div className="grid grid-cols-2 gap-4 mt-8">
                   {[
-                    { label: 'High Court', value: 'Accredited' },
-                    { label: 'Court of Appeal', value: 'Listed' },
-                    { label: 'Labour Court', value: 'Active' },
-                    { label: 'Land Division', value: 'Certified' },
+                    { label: 'High Court of Tanzania', value: 'Advocates' },
+                    { label: 'Court of Appeal', value: 'Practice' },
+                    { label: 'Labour & Employment', value: 'Law' },
+                    { label: 'Land & Property', value: 'Litigation' },
                   ].map(item => (
                     <div key={item.label} className="bg-white/10 rounded-xl p-3 text-center">
                       <p className="text-accent-400 font-bold text-sm">{item.value}</p>
@@ -313,6 +311,7 @@ const LandingPage: React.FC = () => {
                   <h3 className="font-semibold text-gray-900 mb-1">Phone Numbers</h3>
                   <p className="text-gray-600 text-sm">+255 763 717 988</p>
                   <p className="text-gray-600 text-sm">+255 754 494 010</p>
+                  <p className="text-gray-600 text-sm">+255 754 263 269 (Madam Irene)</p>
                 </div>
               </div>
               <div className="flex items-start gap-4 p-5 bg-gray-50 rounded-xl">
@@ -359,11 +358,9 @@ const LandingPage: React.FC = () => {
           <div className="grid md:grid-cols-4 gap-8 mb-8">
             <div className="md:col-span-2">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-accent-500 rounded-lg flex items-center justify-center">
-                  <Scale className="h-5 w-5 text-white" />
-                </div>
+                <img src="/logo-icon.png" alt="Maira &amp; Adhis" className="w-10 h-10 object-contain rounded-lg" />
                 <div>
-                  <p className="font-bold">MAIRA &amp; ADHIS ADVOCATES</p>
+                  <p className="font-bold">MAIRA &amp; ADHIS COMPANY ADVOCATES</p>
                   <p className="text-primary-300 text-xs">Legal Excellence in Tanzania</p>
                 </div>
               </div>
@@ -373,7 +370,7 @@ const LandingPage: React.FC = () => {
               <div className="space-y-1 text-sm text-primary-300">
                 <p>17 Usalama Drive, Drive-in Estate</p>
                 <p>Old Bagamoyo Road, Dar Es Salaam</p>
-                <p>+255 763 717 988 | +255 754 494 010</p>
+                <p>+255 763 717 988 | +255 754 494 010 | +255 754 263 269</p>
                 <p>info@maca.co.tz</p>
               </div>
             </div>
@@ -396,7 +393,7 @@ const LandingPage: React.FC = () => {
             </div>
           </div>
           <div className="border-t border-primary-700 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-primary-400 text-sm">&copy; 2024 MAIRA &amp; ADHIS ADVOCATES. All Rights Reserved.</p>
+            <p className="text-primary-400 text-sm">&copy; 2024 MAIRA &amp; ADHIS COMPANY ADVOCATES. All Rights Reserved.</p>
             <div className="flex gap-4 text-sm text-primary-400">
               <a href="#" className="hover:text-accent-400">Privacy Policy</a>
               <a href="#" className="hover:text-accent-400">Terms of Service</a>

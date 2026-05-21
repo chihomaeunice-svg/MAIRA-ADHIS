@@ -64,6 +64,8 @@ interface NewCaseForm {
   courtName: string;
   plaintiff: string;
   defendant: string;
+  opposingCounsel: string;
+  judgeName: string;
   advocateId: string;
   advocateName: string;
   filingDate: string;
@@ -79,6 +81,8 @@ const defaultForm = (): NewCaseForm => ({
   courtName: 'High Court of Tanzania',
   plaintiff: '',
   defendant: '',
+  opposingCounsel: '',
+  judgeName: '',
   advocateId: '',
   advocateName: '',
   filingDate: new Date().toISOString().split('T')[0],
@@ -192,6 +196,8 @@ const CasesPage: React.FC = () => {
         title: form.title.trim(),
         courtName: form.courtName,
         partiesNames: { plaintiff: form.plaintiff.trim(), defendant: form.defendant.trim() },
+        opposingCounsel: form.opposingCounsel.trim() || null,
+        judgeName: form.judgeName.trim() || null,
         advocateId: form.advocateId,
         advocateName: form.advocateName,
         clientId: '',
@@ -465,6 +471,29 @@ const CasesPage: React.FC = () => {
                     required
                     value={form.defendant}
                     onChange={(e) => setForm((p) => ({ ...p, defendant: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Opposing Counsel</label>
+                  <input
+                    type="text"
+                    value={form.opposingCounsel}
+                    onChange={(e) => setForm((p) => ({ ...p, opposingCounsel: e.target.value }))}
+                    placeholder="Name of opposing advocate / firm"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Presiding Judge / Magistrate</label>
+                  <input
+                    type="text"
+                    value={form.judgeName}
+                    onChange={(e) => setForm((p) => ({ ...p, judgeName: e.target.value }))}
+                    placeholder="e.g. Hon. Justice Mwangi"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                 </div>

@@ -132,7 +132,7 @@ const CaseDetailPage: React.FC = () => {
     .note{background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:10px;margin:6px 0;font-size:12px}
     .hearing{background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:10px;margin:6px 0;font-size:12px}
     @media print{button{display:none}}</style></head><body>
-    <div class="header"><div class="firm">MAIRA &amp; ADHIS ADVOCATES</div>
+    <div class="header"><div class="firm">MAIRA &amp; ADHIS COMPANY ADVOCATES</div>
     <div class="sub">17 Usalama Drive, Dar Es Salaam, Tanzania | Tel: +255 763 717 988 | info@maca.co.tz</div></div>
     <h2>CASE FILE: ${caseData.caseNumber}</h2>
     <table>
@@ -140,7 +140,9 @@ const CaseDetailPage: React.FC = () => {
       <tr><td>Court</td><td>${caseData.courtName}</td></tr>
       <tr><td>Plaintiff</td><td>${caseData.partiesNames.plaintiff}</td></tr>
       <tr><td>Defendant</td><td>${caseData.partiesNames.defendant}</td></tr>
-      <tr><td>Advocate</td><td>${caseData.advocateName}</td></tr>
+      <tr><td>Opposing Counsel</td><td>${caseData.opposingCounsel || '—'}</td></tr>
+      <tr><td>Presiding Judge / Magistrate</td><td>${caseData.judgeName || '—'}</td></tr>
+      <tr><td>Our Advocate</td><td>${caseData.advocateName}</td></tr>
       <tr><td>Filing Date</td><td>${formatDate(caseData.filingDate)}</td></tr>
       <tr><td>Status</td><td>${caseData.status}</td></tr>
       <tr><td>Category</td><td>${caseData.category}</td></tr>
@@ -151,7 +153,7 @@ const CaseDetailPage: React.FC = () => {
     ${caseData.hearingDates.map(h => `<div class="hearing"><strong>${formatDate(h.date)}</strong> — ${h.purpose}<br/><small>${h.venue}</small>${h.outcome ? `<br/><em>Outcome: ${h.outcome}</em>` : ''}</div>`).join('')}
     <h2>Case Notes (${caseData.notes.length})</h2>
     ${caseData.notes.map(n => `<div class="note">${n.content}<br/><small>— ${n.authorName}, ${formatDate(n.createdAt)}</small></div>`).join('')}
-    <p style="margin-top:40px;font-size:10px;color:#999">Printed: ${new Date().toLocaleString()} | MAIRA &amp; ADHIS ADVOCATES — CONFIDENTIAL</p>
+    <p style="margin-top:40px;font-size:10px;color:#999">Printed: ${new Date().toLocaleString()} | MAIRA &amp; ADHIS COMPANY ADVOCATES — CONFIDENTIAL</p>
     </body></html>`);
     w.document.close(); w.print();
   };
@@ -245,6 +247,8 @@ const CaseDetailPage: React.FC = () => {
                 { label: 'Defendant', value: caseData.partiesNames.defendant },
                 { label: 'Category', value: caseData.category },
                 { label: 'Filed Date', value: formatDate(caseData.filingDate) },
+                ...(caseData.opposingCounsel ? [{ label: 'Opposing Counsel', value: caseData.opposingCounsel }] : []),
+                ...(caseData.judgeName ? [{ label: 'Presiding Judge / Magistrate', value: caseData.judgeName }] : []),
               ].map(item => (
                 <div key={item.label}>
                   <p className="text-xs text-gray-400 font-medium">{item.label}</p>
@@ -296,6 +300,8 @@ const CaseDetailPage: React.FC = () => {
               {[
                 { icon: User, label: 'Client', value: caseData.clientName },
                 { icon: Scale, label: 'Advocate', value: caseData.advocateName },
+                { icon: User, label: 'Opposing Counsel', value: caseData.opposingCounsel || '—' },
+                { icon: User, label: 'Judge / Magistrate', value: caseData.judgeName || '—' },
                 { icon: Calendar, label: 'Last Updated', value: formatDate(caseData.updatedAt) },
               ].map(item => (
                 <div key={item.label} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50">

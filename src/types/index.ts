@@ -66,6 +66,8 @@ export interface Case {
   notes: Note[];
   documents: DocumentRef[];
   judgment?: string;
+  opposingCounsel?: string;
+  judgeName?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -84,7 +86,7 @@ export interface Client {
   createdAt: Date;
 }
 
-export type DocumentCategory = 'CERTIFICATE' | 'TAX' | 'BRELA' | 'CONTRACT' | 'POLICY' | 'COURT' | 'OTHER';
+export type DocumentCategory = 'CERTIFICATE' | 'TAX' | 'BRELA' | 'CONTRACT' | 'POLICY' | 'COURT' | 'LAND_TRIBUNAL' | 'MUNICIPAL' | 'OTHER';
 
 export interface Document {
   id: string;
