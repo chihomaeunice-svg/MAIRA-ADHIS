@@ -30,9 +30,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   useEffect(() => {
     // Handle dynamic routes like /cases/:id
     const basePath = '/' + location.pathname.split('/')[1];
-    const title = pageTitles[basePath] || pageTitles[location.pathname] || 'MAIRA & ADHIS ADVOCATES';
+    const title = pageTitles[basePath] || pageTitles[location.pathname] || 'MAIRA & ADHIS COMPANY ADVOCATES';
     setPageTitle(title);
-    document.title = `${title} | MAIRA & ADHIS ADVOCATES`;
+    document.title = `${title} | MAIRA & ADHIS COMPANY ADVOCATES`;
   }, [location.pathname, setPageTitle]);
 
   return (

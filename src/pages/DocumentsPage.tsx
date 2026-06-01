@@ -39,10 +39,12 @@ const CATEGORIES: { value: DocumentCategory | 'ALL'; label: string; color: strin
   { value: 'CONTRACT', label: 'Contracts', color: 'bg-green-50 text-green-700' },
   { value: 'POLICY', label: 'Policies', color: 'bg-orange-50 text-orange-700' },
   { value: 'COURT', label: 'Court Documents', color: 'bg-red-50 text-red-700' },
+  { value: 'LAND_TRIBUNAL', label: 'Land & Housing Tribunal', color: 'bg-teal-50 text-teal-700' },
+  { value: 'MUNICIPAL', label: 'Municipal Documents', color: 'bg-indigo-50 text-indigo-700' },
   { value: 'OTHER', label: 'Other', color: 'bg-gray-100 text-gray-600' },
 ];
 
-const CATEGORY_SELECT: DocumentCategory[] = ['CERTIFICATE', 'TAX', 'BRELA', 'CONTRACT', 'POLICY', 'COURT', 'OTHER'];
+const CATEGORY_SELECT: DocumentCategory[] = ['CERTIFICATE', 'TAX', 'BRELA', 'CONTRACT', 'POLICY', 'COURT', 'LAND_TRIBUNAL', 'MUNICIPAL', 'OTHER'];
 
 function getCategoryColor(category: string): string {
   const cat = CATEGORIES.find((c) => c.value === category);

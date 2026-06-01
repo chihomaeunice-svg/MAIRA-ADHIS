@@ -94,13 +94,11 @@ const Sidebar: React.FC = () => {
       {/* Logo */}
       <div className="flex items-center justify-between px-4 py-4 border-b border-primary-700">
         <div className={clsx('flex items-center gap-3 overflow-hidden', !sidebarOpen && 'justify-center w-full')}>
-          <div className="w-8 h-8 flex-shrink-0 bg-accent-500 rounded-lg flex items-center justify-center">
-            <Scale className="h-5 w-5 text-white" />
-          </div>
+          <img src="/logo-icon.png" alt="M&A" className="w-8 h-8 flex-shrink-0 object-contain rounded-lg bg-white/10" />
           {sidebarOpen && (
             <div className="overflow-hidden">
               <p className="text-white font-bold text-sm leading-tight whitespace-nowrap">MAIRA &amp; ADHIS</p>
-              <p className="text-primary-200 text-xs whitespace-nowrap">ADVOCATES</p>
+              <p className="text-primary-200 text-xs whitespace-nowrap">COMPANY ADVOCATES</p>
             </div>
           )}
         </div>

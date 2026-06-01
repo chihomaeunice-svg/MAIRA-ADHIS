@@ -52,12 +52,10 @@ const MobileSidebar: React.FC = () => {
       <aside className="absolute left-0 top-0 bottom-0 w-64 bg-primary-600 flex flex-col">
         <div className="flex items-center justify-between px-4 py-4 border-b border-primary-700">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-accent-500 rounded-lg flex items-center justify-center">
-              <Scale className="h-5 w-5 text-white" />
-            </div>
+            <img src="/logo-icon.png" alt="M&A" className="w-8 h-8 object-contain rounded-lg bg-white/10" />
             <div>
               <p className="text-white font-bold text-sm">MAIRA &amp; ADHIS</p>
-              <p className="text-primary-200 text-xs">ADVOCATES</p>
+              <p className="text-primary-200 text-xs">COMPANY ADVOCATES</p>
             </div>
           </div>
           <button

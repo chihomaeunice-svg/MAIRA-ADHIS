@@ -69,7 +69,7 @@ const CorrespondencePage: React.FC = () => {
     type: 'LETTER',
     reference: '',
     subject: '',
-    fromParty: 'MAIRA & ADHIS ADVOCATES',
+    fromParty: 'MAIRA & ADHIS COMPANY ADVOCATES',
     toParty: '',
     date: todayStr(),
     direction: 'SENT',
@@ -180,7 +180,7 @@ const CorrespondencePage: React.FC = () => {
       setShowModal(false);
       setForm({
         type: 'LETTER', reference: '', subject: '',
-        fromParty: 'MAIRA & ADHIS ADVOCATES', toParty: '',
+        fromParty: 'MAIRA & ADHIS COMPANY ADVOCATES', toParty: '',
         date: todayStr(), direction: 'SENT', relatedCaseId: '', content: '',
       });
       fetchItems();
