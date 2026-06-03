@@ -45,6 +45,7 @@ const LOCAL_FALLBACK_USERS: FirestoreUser[] = [
     status: 'ACTIVE',
     createdAt: new Date('2024-02-01'),
     updatedAt: new Date('2024-02-01'),
+    lastLogin: null,
   },
   {
     uid: 'local-secretary',
@@ -54,6 +55,7 @@ const LOCAL_FALLBACK_USERS: FirestoreUser[] = [
     status: 'ACTIVE',
     createdAt: new Date('2024-03-01'),
     updatedAt: new Date('2024-03-01'),
+    lastLogin: null,
   },
   {
     uid: 'local-accountant',
@@ -63,6 +65,7 @@ const LOCAL_FALLBACK_USERS: FirestoreUser[] = [
     status: 'ACTIVE',
     createdAt: new Date('2024-03-01'),
     updatedAt: new Date('2024-03-01'),
+    lastLogin: null,
   },
 ];
 
