@@ -1,19 +1,74 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Users, Eye, Building2, User, Phone, Mail } from 'lucide-react';
+import { Plus, Search, Users, Eye, Building2, User, Phone, Mail, X } from 'lucide-react';
+import { collection, addDoc, getDocs, query, orderBy, Timestamp } from 'firebase/firestore';
+import { db } from '@/firebase';
 import { mockClients } from '@/data/mockData';
 import { Client } from '@/types';
-import { formatDate } from '@/lib/utils';
 import { useUIStore } from '@/stores/uiStore';
+import { useAuthStore } from '@/stores/authStore';
 import { clsx } from 'clsx';
+import toast from 'react-hot-toast';
+
+interface NewClientForm {
+  fullName: string;
+  phone: string;
+  email: string;
+  address: string;
+  idNumber: string;
+  clientType: 'INDIVIDUAL' | 'CORPORATE';
+  companyName: string;
+  companyReg: string;
+}
+
+const defaultForm = (): NewClientForm => ({
+  fullName: '',
+  phone: '',
+  email: '',
+  address: '',
+  idNumber: '',
+  clientType: 'INDIVIDUAL',
+  companyName: '',
+  companyReg: '',
+});
 
 const ClientsPage: React.FC = () => {
   const { setPageTitle } = useUIStore();
-  const [clients] = useState<Client[]>(mockClients);
+  const { user, isLocalSession } = useAuthStore();
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<'ALL' | 'INDIVIDUAL' | 'CORPORATE'>('ALL');
+  const [showNewClient, setShowNewClient] = useState(false);
+  const [form, setForm] = useState<NewClientForm>(defaultForm());
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => { setPageTitle('Clients'); }, [setPageTitle]);
+
+  const fetchClients = async () => {
+    setLoading(true);
+    if (isLocalSession) {
+      setClients(mockClients);
+      setLoading(false);
+      return;
+    }
+    try {
+      const snap = await getDocs(query(collection(db, 'clients'), orderBy('createdAt', 'desc')));
+      const data = snap.docs.map(d => ({
+        id: d.id,
+        ...d.data(),
+        createdAt: d.data().createdAt?.toDate?.() ?? new Date(),
+        cases: d.data().cases ?? [],
+      })) as Client[];
+      setClients(data.length > 0 ? data : mockClients);
+    } catch {
+      setClients(mockClients);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchClients(); }, []);
 
   const filtered = clients.filter((c) => {
     const matchSearch =
@@ -26,6 +81,59 @@ const ClientsPage: React.FC = () => {
     return matchSearch && matchType;
   });
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.fullName.trim()) { toast.error('Full name is required'); return; }
+    if (!form.phone.trim()) { toast.error('Phone number is required'); return; }
+    if (!form.email.trim()) { toast.error('Email is required'); return; }
+    if (form.clientType === 'CORPORATE' && !form.companyName.trim()) {
+      toast.error('Company name is required for corporate clients');
+      return;
+    }
+    setSaving(true);
+    try {
+      const now = Timestamp.now();
+      const docRef = await addDoc(collection(db, 'clients'), {
+        fullName: form.fullName.trim(),
+        phone: form.phone.trim(),
+        email: form.email.trim(),
+        address: form.address.trim(),
+        idNumber: form.idNumber.trim() || null,
+        clientType: form.clientType,
+        companyName: form.clientType === 'CORPORATE' ? form.companyName.trim() : null,
+        companyReg: form.clientType === 'CORPORATE' ? form.companyReg.trim() || null : null,
+        cases: [],
+        addedBy: user?.id || 'unknown',
+        addedByName: user?.name || 'Unknown',
+        createdAt: now,
+      });
+
+      const newClient: Client = {
+        id: docRef.id,
+        fullName: form.fullName.trim(),
+        phone: form.phone.trim(),
+        email: form.email.trim(),
+        address: form.address.trim(),
+        idNumber: form.idNumber.trim() || undefined,
+        clientType: form.clientType,
+        companyName: form.clientType === 'CORPORATE' ? form.companyName.trim() : undefined,
+        companyReg: form.clientType === 'CORPORATE' ? form.companyReg.trim() || undefined : undefined,
+        cases: [],
+        createdAt: new Date(),
+      };
+
+      setClients(prev => [newClient, ...prev]);
+      toast.success('Client added successfully');
+      setShowNewClient(false);
+      setForm(defaultForm());
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to save client. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -34,7 +142,10 @@ const ClientsPage: React.FC = () => {
           <h1 className="text-xl font-semibold text-gray-900">Clients</h1>
           <p className="text-sm text-gray-500 mt-0.5">{filtered.length} of {clients.length} clients</p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors shadow-sm">
+        <button
+          onClick={() => setShowNewClient(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
+        >
           <Plus className="h-4 w-4" />
           New Client
         </button>
@@ -74,7 +185,11 @@ const ClientsPage: React.FC = () => {
       </div>
 
       {/* Client Cards Grid */}
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 py-16 text-center">
           <Users className="h-12 w-12 text-gray-300 mx-auto mb-3" />
           <p className="text-gray-500 font-medium">No clients found</p>
@@ -139,6 +254,150 @@ const ClientsPage: React.FC = () => {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* New Client Modal */}
+      {showNewClient && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">New Client</h2>
+              <button onClick={() => { setShowNewClient(false); setForm(defaultForm()); }} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+                <X className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+
+            <form id="new-client-form" onSubmit={handleSubmit} className="overflow-y-auto px-6 py-5 space-y-4">
+              {/* Client Type */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Client Type</label>
+                <div className="flex gap-2">
+                  {(['INDIVIDUAL', 'CORPORATE'] as const).map(t => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setForm(f => ({ ...f, clientType: t }))}
+                      className={clsx(
+                        'flex-1 py-2 rounded-lg text-sm font-medium border transition-colors',
+                        form.clientType === t
+                          ? 'bg-primary-600 text-white border-primary-600'
+                          : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                      )}
+                    >
+                      {t === 'INDIVIDUAL' ? 'Individual' : 'Corporate'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Full Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
+                <input
+                  type="text"
+                  value={form.fullName}
+                  onChange={e => setForm(f => ({ ...f, fullName: e.target.value }))}
+                  placeholder="e.g. John Mwangi"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+
+              {/* Corporate fields */}
+              {form.clientType === 'CORPORATE' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Company Name *</label>
+                    <input
+                      type="text"
+                      value={form.companyName}
+                      onChange={e => setForm(f => ({ ...f, companyName: e.target.value }))}
+                      placeholder="e.g. Acme Ltd"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Registration No.</label>
+                    <input
+                      type="text"
+                      value={form.companyReg}
+                      onChange={e => setForm(f => ({ ...f, companyReg: e.target.value }))}
+                      placeholder="e.g. 12345678"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Phone & Email */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone *</label>
+                  <input
+                    type="tel"
+                    value={form.phone}
+                    onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                    placeholder="+255 7XX XXX XXX"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                  <input
+                    type="email"
+                    value={form.email}
+                    onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                    placeholder="client@example.com"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+              </div>
+
+              {/* Address */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                <input
+                  type="text"
+                  value={form.address}
+                  onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
+                  placeholder="e.g. P.O. Box 123, Dar es Salaam"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+
+              {/* ID Number */}
+              {form.clientType === 'INDIVIDUAL' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ID / Passport Number</label>
+                  <input
+                    type="text"
+                    value={form.idNumber}
+                    onChange={e => setForm(f => ({ ...f, idNumber: e.target.value }))}
+                    placeholder="National ID or Passport"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+              )}
+            </form>
+
+            <div className="flex gap-3 px-6 py-4 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={() => { setShowNewClient(false); setForm(defaultForm()); }}
+                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="new-client-form"
+                disabled={saving}
+                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {saving ? 'Saving...' : 'Add Client'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
