@@ -48,11 +48,11 @@ const LoginPage: React.FC = () => {
       <div className="w-full max-w-md relative z-10">
         {/* Logo / Brand */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-accent-500 rounded-2xl shadow-xl mb-4">
-            <Scale className="h-9 w-9 text-white" />
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl shadow-xl mb-4 overflow-hidden bg-white">
+            <img src="/logo-icon.png" alt="Maira &amp; Adhis" className="h-14 w-14 object-contain" />
           </div>
           <h1 className="text-2xl font-bold text-white tracking-wide">MAIRA &amp; ADHIS</h1>
-          <p className="text-primary-200 text-sm tracking-widest uppercase mt-1">Advocates</p>
+          <p className="text-primary-200 text-sm tracking-widest uppercase mt-1">Company Advocates</p>
           <p className="text-primary-300 text-xs mt-1">Chartered Secretaries &amp; Legal Consultants</p>
           <p className="text-primary-400 text-xs">Dar es Salaam, Tanzania</p>
         </div>
@@ -145,7 +145,7 @@ const LoginPage: React.FC = () => {
             <ArrowLeft className="h-3.5 w-3.5" /> Back to Main Website
           </Link>
           <p className="text-primary-400 text-xs">
-            &copy; {new Date().getFullYear()} MAIRA &amp; ADHIS ADVOCATES. All rights reserved.
+            &copy; {new Date().getFullYear()} MAIRA &amp; ADHIS COMPANY ADVOCATES. All rights reserved.
           </p>
         </div>
       </div>

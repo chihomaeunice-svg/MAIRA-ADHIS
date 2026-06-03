@@ -10,7 +10,7 @@ const ContactPage: React.FC = () => (
           <div className="w-8 h-8 bg-accent-500 rounded-lg flex items-center justify-center">
             <Scale className="h-5 w-5" />
           </div>
-          <span className="font-bold">MAIRA &amp; ADHIS ADVOCATES</span>
+          <span className="font-bold">MAIRA &amp; ADHIS COMPANY ADVOCATES</span>
         </Link>
         <Link to="/" className="flex items-center gap-2 text-primary-200 hover:text-white text-sm">
           <ArrowLeft className="h-4 w-4" /> Back
@@ -33,6 +33,7 @@ const ContactPage: React.FC = () => (
             <h3 className="font-semibold mb-2">Phone</h3>
             <p className="text-gray-600 text-sm">+255 763 717 988</p>
             <p className="text-gray-600 text-sm">+255 754 494 010</p>
+            <p className="text-gray-600 text-sm">+255 754 263 269 (Madam Irene)</p>
           </div>
         </div>
         <div className="bg-white rounded-xl p-6 shadow-card flex items-start gap-4">
