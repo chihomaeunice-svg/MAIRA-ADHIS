@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Plus, Search, Users, Eye, Building2, User, Phone, Mail, X, Trash2 } from 'lucide-react';
 import { collection, addDoc, getDocs, query, orderBy, Timestamp, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '@/firebase';
-import { mockClients } from '@/data/mockData';
+
 import { Client } from '@/types';
 import { useUIStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -49,7 +49,7 @@ const ClientsPage: React.FC = () => {
   const fetchClients = async () => {
     setLoading(true);
     if (isLocalSession) {
-      setClients(mockClients);
+      setClients([]);
       setLoading(false);
       return;
     }
@@ -61,9 +61,9 @@ const ClientsPage: React.FC = () => {
         createdAt: d.data().createdAt?.toDate?.() ?? new Date(),
         cases: d.data().cases ?? [],
       })) as Client[];
-      setClients(data.length > 0 ? data : mockClients);
+      setClients(data);
     } catch {
-      setClients(mockClients);
+      setClients([]);
     } finally {
       setLoading(false);
     }

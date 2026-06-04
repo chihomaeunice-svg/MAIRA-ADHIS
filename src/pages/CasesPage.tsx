@@ -5,7 +5,7 @@ import {
   collection, addDoc, getDocs, query, orderBy, Timestamp, deleteDoc, doc,
 } from 'firebase/firestore';
 import { db } from '@/firebase';
-import { mockCases, mockEmployees } from '@/data/mockData';
+import { mockEmployees } from '@/data/mockData';
 import { Case, CaseStatus } from '@/types';
 import { formatDate, getStatusColor } from '@/lib/utils';
 import { useUIStore } from '@/stores/uiStore';
@@ -140,10 +140,10 @@ const CasesPage: React.FC = () => {
         });
         setCases(fetched);
       } else {
-        setCases(mockCases);
+        setCases([]);
       }
     } catch {
-      setCases(mockCases);
+      setCases([]);
     } finally {
       setLoading(false);
     }

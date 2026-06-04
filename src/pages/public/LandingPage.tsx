@@ -292,7 +292,7 @@ const LandingPage: React.FC = () => {
                   <h3 className="font-semibold text-gray-900 mb-1">Phone Numbers</h3>
                   <p className="text-gray-600 text-sm">+255 763 717 988</p>
                   <p className="text-gray-600 text-sm">+255 754 494 010</p>
-                  <p className="text-gray-600 text-sm">+255 754 263 269 (Madam Irene)</p>
+                  <p className="text-gray-600 text-sm">+255 754 263 269</p>
                 </div>
               </div>
               <div className="flex items-start gap-4 p-5 bg-gray-50 rounded-xl">

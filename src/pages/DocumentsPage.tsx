@@ -10,7 +10,7 @@ import { db } from '@/firebase';
 import { useStorage } from '@/hooks/useStorage';
 import { useAuthStore } from '@/stores/authStore';
 import { useUIStore } from '@/stores/uiStore';
-import { mockDocuments } from '@/data/mockData';
+
 import { DocumentCategory } from '@/types';
 import { formatDate, formatFileSize } from '@/lib/utils';
 import { clsx } from 'clsx';
@@ -142,39 +142,10 @@ const DocumentsPage: React.FC = () => {
       if (docs.length > 0) {
         setDocuments(docs);
       } else {
-        // Fall back to mock data mapped to our structure
-        const mapped: FirestoreDocument[] = mockDocuments.map((d) => ({
-          id: d.id,
-          name: d.name,
-          category: d.category,
-          fileUrl: d.fileUrl,
-          storagePath: '',
-          fileSize: d.fileSize,
-          fileType: 'application/pdf',
-          uploadedBy: d.uploadedBy,
-          uploadedByName: d.uploadedBy,
-          relatedCase: d.relatedCaseId,
-          expiryDate: d.expiryDate ? d.expiryDate.toISOString().split('T')[0] : undefined,
-          createdAt: d.createdAt,
-        }));
-        setDocuments(mapped);
+        setDocuments([]);
       }
     } catch {
-      const mapped: FirestoreDocument[] = mockDocuments.map((d) => ({
-        id: d.id,
-        name: d.name,
-        category: d.category,
-        fileUrl: d.fileUrl,
-        storagePath: '',
-        fileSize: d.fileSize,
-        fileType: 'application/pdf',
-        uploadedBy: d.uploadedBy,
-        uploadedByName: d.uploadedBy,
-        relatedCase: d.relatedCaseId,
-        expiryDate: d.expiryDate ? d.expiryDate.toISOString().split('T')[0] : undefined,
-        createdAt: d.createdAt,
-      }));
-      setDocuments(mapped);
+      setDocuments([]);
     } finally {
       setLoading(false);
     }
