@@ -12,7 +12,6 @@ const practiceAreas = [
   { icon: Building, title: 'Conveyances & Property', desc: 'Comprehensive property law services including title transfers, land disputes, and conveyancing.', color: 'bg-green-50 text-green-600' },
   { icon: Users, title: 'Labour Law', desc: 'Protecting employee and employer rights in employment disputes, unfair dismissal, and workplace matters.', color: 'bg-purple-50 text-purple-600' },
   { icon: FileText, title: 'Notary Public', desc: 'Official notarization, certification of documents, and commissioner for oaths services.', color: 'bg-yellow-50 text-yellow-600' },
-  { icon: Shield, title: 'Criminal Defense', desc: 'Vigorous defense representation in criminal proceedings across all court levels in Tanzania.', color: 'bg-red-50 text-red-600' },
 ];
 
 const testimonials = [
@@ -141,24 +140,6 @@ const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Stats Bar */}
-      <div className="bg-primary-600 py-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {[
-              { value: '20+', label: 'Years Experience' },
-              { value: '500+', label: 'Cases Won' },
-              { value: '1000+', label: 'Clients Served' },
-              { value: '6', label: 'Practice Areas' },
-            ].map((stat) => (
-              <div key={stat.label} className="text-center">
-                <p className="text-3xl font-bold text-accent-400">{stat.value}</p>
-                <p className="text-primary-200 text-sm mt-1">{stat.label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
 
       {/* Practice Areas */}
       <section id="practice-areas" className="py-20 bg-gray-50">
@@ -386,7 +367,7 @@ const LandingPage: React.FC = () => {
             <div>
               <h4 className="font-semibold mb-4 text-accent-400">Practice Areas</h4>
               <ul className="space-y-2 text-sm text-primary-300">
-                {['Commercial & Corporate', 'Family Matters', 'Conveyances', 'Labour Law', 'Notary Public', 'Criminal Defense'].map(a => (
+                {['Commercial & Corporate', 'Family Matters', 'Conveyances', 'Labour Law', 'Notary Public'].map(a => (
                   <li key={a}><a href="#practice-areas" className="hover:text-accent-400 transition-colors">{a}</a></li>
                 ))}
               </ul>

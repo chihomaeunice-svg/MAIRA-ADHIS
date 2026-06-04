@@ -106,7 +106,7 @@ export function useAuth() {
 
   const login = async (email: string, password: string) => {
     // First try local staff accounts (works without Firebase Auth accounts being created)
-    const local = LOCAL_STAFF[email.toLowerCase()];
+    const local = LOCAL_STAFF[email.trim().toLowerCase()];
     if (local && local.password === password) {
       // Sign into Firebase with local credentials
       try {

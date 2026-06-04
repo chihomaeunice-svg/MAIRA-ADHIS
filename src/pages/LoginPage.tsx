@@ -21,10 +21,10 @@ const LoginPage: React.FC = () => {
       navigate('/dashboard');
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code;
-      if (code === 'auth/user-not-found' || code === 'auth/invalid-credential') {
+      if (code === 'auth/user-not-found') {
         setError('No account found with this email address.');
-      } else if (code === 'auth/wrong-password') {
-        setError('Incorrect password. Please try again.');
+      } else if (code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
+        setError('Invalid email or password. Please try again.');
       } else if (code === 'auth/too-many-requests') {
         setError('Too many failed attempts. Please try again later.');
       } else if (code === 'auth/user-disabled') {
