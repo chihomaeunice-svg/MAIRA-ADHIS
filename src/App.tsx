@@ -26,6 +26,7 @@ import CalendarPage from '@/pages/CalendarPage';
 import ReportsPage from '@/pages/ReportsPage';
 import SettingsPage from '@/pages/SettingsPage';
 import UserManagementPage from '@/pages/dashboard/UserManagementPage';
+import MessagesPage from '@/pages/MessagesPage';
 import NotFoundPage from '@/pages/NotFoundPage';
 
 function AppInitializer({ children }: { children: React.ReactNode }) {
@@ -106,6 +107,7 @@ function AppRoutes() {
       <Route path="/reports" element={<ProtectedRoute page="reports"><DashboardLayout><ReportsPage /></DashboardLayout></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute page="settings"><DashboardLayout><SettingsPage /></DashboardLayout></ProtectedRoute>} />
       <Route path="/users" element={<ProtectedRoute page="users"><DashboardLayout><UserManagementPage /></DashboardLayout></ProtectedRoute>} />
+      <Route path="/messages" element={<ProtectedRoute page="messages"><DashboardLayout><MessagesPage /></DashboardLayout></ProtectedRoute>} />
 
       <Route path="*" element={<NotFoundPage />} />
     </Routes>

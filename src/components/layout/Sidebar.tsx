@@ -4,7 +4,7 @@ import { clsx } from 'clsx';
 import {
   LayoutDashboard, Briefcase, Users, FileText, Mail, ShoppingCart,
   UserCog, Calendar, BarChart3, Settings, LogOut, Scale,
-  ChevronLeft, ChevronRight, Globe, UserCog2,
+  ChevronLeft, ChevronRight, Globe, UserCog2, MessageSquare,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { useUIStore } from '@/stores/uiStore';
@@ -43,6 +43,7 @@ const navSections: NavSection[] = [
     items: [
       { label: 'Documents', path: '/documents', icon: FileText, permission: 'documents' },
       { label: 'Correspondence', path: '/correspondence', icon: Mail, permission: 'correspondence' },
+      { label: 'Messages', path: '/messages', icon: MessageSquare, permission: 'messages' },
       { label: 'Procurement', path: '/procurement', icon: ShoppingCart, permission: 'procurement' },
       { label: 'Employees', path: '/employees', icon: UserCog, permission: 'employees' },
     ],
