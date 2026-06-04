@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Users, Eye, Building2, User, Phone, Mail, X } from 'lucide-react';
-import { collection, addDoc, getDocs, query, orderBy, Timestamp } from 'firebase/firestore';
+import { Plus, Search, Users, Eye, Building2, User, Phone, Mail, X, Trash2 } from 'lucide-react';
+import { collection, addDoc, getDocs, query, orderBy, Timestamp, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { mockClients } from '@/data/mockData';
 import { Client } from '@/types';
@@ -42,6 +42,7 @@ const ClientsPage: React.FC = () => {
   const [showNewClient, setShowNewClient] = useState(false);
   const [form, setForm] = useState<NewClientForm>(defaultForm());
   const [saving, setSaving] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   useEffect(() => { setPageTitle('Clients'); }, [setPageTitle]);
 
@@ -80,6 +81,18 @@ const ClientsPage: React.FC = () => {
     const matchType = typeFilter === 'ALL' || c.clientType === typeFilter;
     return matchSearch && matchType;
   });
+
+  const handleDeleteClient = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'clients', id));
+      setClients(prev => prev.filter(c => c.id !== id));
+      toast.success('Client deleted');
+    } catch {
+      toast.error('Failed to delete client');
+    } finally {
+      setDeleteConfirmId(null);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -244,13 +257,25 @@ const ClientsPage: React.FC = () => {
                   <span className="text-gray-300 mx-1.5">·</span>
                   Since {new Date(client.createdAt).getFullYear()}
                 </div>
-                <Link
-                  to={`/clients/${client.id}`}
-                  className="inline-flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 font-medium"
-                >
-                  <Eye className="h-3.5 w-3.5" />
-                  View
-                </Link>
+                <div className="flex items-center gap-2">
+                  {deleteConfirmId === client.id ? (
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => handleDeleteClient(client.id)} className="text-xs px-2 py-1 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700">Confirm</button>
+                      <button onClick={() => setDeleteConfirmId(null)} className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded-lg font-medium hover:bg-gray-200">Cancel</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setDeleteConfirmId(client.id)} className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Delete client">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  <Link
+                    to={`/clients/${client.id}`}
+                    className="inline-flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 font-medium"
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                    View
+                  </Link>
+                </div>
               </div>
             </div>
           ))}
