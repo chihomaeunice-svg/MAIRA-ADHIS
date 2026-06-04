@@ -33,7 +33,7 @@ const ContactPage: React.FC = () => (
             <h3 className="font-semibold mb-2">Phone</h3>
             <p className="text-gray-600 text-sm">+255 763 717 988</p>
             <p className="text-gray-600 text-sm">+255 754 494 010</p>
-            <p className="text-gray-600 text-sm">+255 754 263 269 (Madam Irene)</p>
+            <p className="text-gray-600 text-sm">+255 754 263 269</p>
           </div>
         </div>
         <div className="bg-white rounded-xl p-6 shadow-card flex items-start gap-4">

@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Filter, Briefcase, Eye, Calendar, User, X } from 'lucide-react';
+import { Plus, Search, Filter, Briefcase, Eye, Calendar, User, X, Trash2 } from 'lucide-react';
 import {
-  collection, addDoc, getDocs, query, orderBy, Timestamp,
+  collection, addDoc, getDocs, query, orderBy, Timestamp, deleteDoc, doc,
 } from 'firebase/firestore';
 import { db } from '@/firebase';
-import { mockCases, mockEmployees } from '@/data/mockData';
+import { mockEmployees } from '@/data/mockData';
 import { Case, CaseStatus } from '@/types';
 import { formatDate, getStatusColor } from '@/lib/utils';
 import { useUIStore } from '@/stores/uiStore';
@@ -104,6 +104,7 @@ const CasesPage: React.FC = () => {
   const [showNewCase, setShowNewCase] = useState(false);
   const [form, setForm] = useState<NewCaseForm>(defaultForm());
   const [saving, setSaving] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   useEffect(() => { setPageTitle('Cases'); }, [setPageTitle]);
 
@@ -139,10 +140,10 @@ const CasesPage: React.FC = () => {
         });
         setCases(fetched);
       } else {
-        setCases(mockCases);
+        setCases([]);
       }
     } catch {
-      setCases(mockCases);
+      setCases([]);
     } finally {
       setLoading(false);
     }
@@ -168,6 +169,18 @@ const CasesPage: React.FC = () => {
     ONGOING: cases.filter((c) => c.status === 'ONGOING').length,
     COMPLETED: cases.filter((c) => c.status === 'COMPLETED').length,
     ARCHIVED: cases.filter((c) => c.status === 'ARCHIVED').length,
+  };
+
+  const handleDeleteCase = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'cases', id));
+      setCases(prev => prev.filter(c => c.id !== id));
+      toast.success('Case deleted');
+    } catch {
+      toast.error('Failed to delete case');
+    } finally {
+      setDeleteConfirmId(null);
+    }
   };
 
   const handleAdvocateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -380,13 +393,25 @@ const CasesPage: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-5 py-3.5">
-                      <Link
-                        to={`/cases/${c.id}`}
-                        className="inline-flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 font-medium"
-                      >
-                        <Eye className="h-3.5 w-3.5" />
-                        View
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          to={`/cases/${c.id}`}
+                          className="inline-flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 font-medium"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          View
+                        </Link>
+                        {deleteConfirmId === c.id ? (
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => handleDeleteCase(c.id)} className="text-xs px-2 py-1 bg-red-600 text-white rounded font-medium hover:bg-red-700">Confirm</button>
+                            <button onClick={() => setDeleteConfirmId(null)} className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded font-medium hover:bg-gray-200">Cancel</button>
+                          </div>
+                        ) : (
+                          <button onClick={() => setDeleteConfirmId(c.id)} className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors" title="Delete case">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -14,9 +14,7 @@ import {
 import { db } from '@/firebase';
 import { useAuthStore } from '@/stores/authStore';
 import { useUIStore } from '@/stores/uiStore';
-import {
-  mockCases, mockClients, mockCalendarEvents, mockMonthlyStats, mockExpensesByMonth,
-} from '@/data/mockData';
+
 import { formatDate, formatCurrency, getStatusColor } from '@/lib/utils';
 import { clsx } from 'clsx';
 
@@ -26,12 +24,15 @@ const DashboardPage: React.FC = () => {
   const { user } = useAuthStore();
   const { setPageTitle } = useUIStore();
 
-  const [totalCases, setTotalCases] = useState(mockCases.length);
-  const [activeCases, setActiveCases] = useState(mockCases.filter((c) => c.status === 'ONGOING').length);
-  const [newCases, setNewCases] = useState(mockCases.filter((c) => c.status === 'NEW').length);
-  const [completedCases, setCompletedCases] = useState(mockCases.filter((c) => c.status === 'COMPLETED').length);
+  const [totalCases, setTotalCases] = useState(0);
+  const [activeCases, setActiveCases] = useState(0);
+  const [newCases, setNewCases] = useState(0);
+  const [completedCases, setCompletedCases] = useState(0);
   const [monthlyIncome, setMonthlyIncome] = useState(0);
-  const [monthlyExpenses, setMonthlyExpenses] = useState(mockExpensesByMonth[mockExpensesByMonth.length - 1]?.amount || 0);
+  const [totalClients, setTotalClients] = useState(0);
+  const [recentCases, setRecentCases] = useState<Array<{id:string;title:string;caseNumber:string;advocateName:string;status:string;updatedAt:Date}>>([]);
+  const [upcomingEvents, setUpcomingEvents] = useState<Array<{id:string;title:string;type:string;date:Date;location?:string}>>([]);
+  const [monthlyExpenses, setMonthlyExpenses] = useState(0);
 
   useEffect(() => {
     setPageTitle('Dashboard');
@@ -82,17 +83,53 @@ const DashboardPage: React.FC = () => {
       } catch { /* use default */ }
     };
 
+    const fetchClients = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'clients'));
+        setTotalClients(snap.docs.length);
+      } catch { /* ignore */ }
+    };
+    const fetchRecentCases = async () => {
+      try {
+        const snap = await getDocs(query(collection(db, 'cases'), orderBy('updatedAt', 'desc')));
+        const data = snap.docs.slice(0, 5).map(d => ({
+          id: d.id,
+          title: d.data().title || '',
+          caseNumber: d.data().caseNumber || '',
+          advocateName: d.data().advocateName || '',
+          status: d.data().status || 'NEW',
+          updatedAt: d.data().updatedAt?.toDate ? d.data().updatedAt.toDate() : new Date(),
+        }));
+        setRecentCases(data);
+      } catch { /* ignore */ }
+    };
+    const fetchEvents = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'calendarEvents'));
+        const now = new Date();
+        const data = snap.docs
+          .map(d => ({
+            id: d.id,
+            title: d.data().title || '',
+            type: d.data().type || 'REMINDER',
+            date: d.data().date?.toDate ? d.data().date.toDate() : new Date(d.data().date),
+            location: d.data().location,
+          }))
+          .filter(e => e.date >= now)
+          .sort((a, b) => a.date.getTime() - b.date.getTime())
+          .slice(0, 4);
+        setUpcomingEvents(data);
+      } catch { /* ignore */ }
+    };
     fetchCases();
     fetchIncome();
     fetchExpenses();
+    fetchClients();
+    fetchRecentCases();
+    fetchEvents();
   }, []);
 
-  const totalClients = mockClients.length;
-
-  const now = new Date();
-  const upcomingHearings = mockCalendarEvents.filter(
-    (e) => e.type === 'HEARING' && new Date(e.date) >= now
-  ).length;
+  const upcomingHearings = upcomingEvents.filter(e => e.type === "HEARING").length;
 
   const casesByStatus = [
     { name: 'Ongoing', value: activeCases },
@@ -100,15 +137,6 @@ const DashboardPage: React.FC = () => {
     { name: 'Completed', value: completedCases },
     { name: 'Archived', value: totalCases - activeCases - newCases - completedCases },
   ];
-
-  const recentCases = [...mockCases]
-    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-    .slice(0, 5);
-
-  const upcomingEvents = mockCalendarEvents
-    .filter((e) => new Date(e.date) >= now)
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    .slice(0, 4);
 
   const stats = [
     {
@@ -212,7 +240,7 @@ const DashboardPage: React.FC = () => {
         <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 p-5 shadow-card">
           <h3 className="text-sm font-semibold text-gray-900 mb-4">Cases Overview – 2024</h3>
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={mockMonthlyStats} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+            <BarChart data={[]} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
               <XAxis dataKey="month" tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} />
@@ -252,7 +280,7 @@ const DashboardPage: React.FC = () => {
       <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-card">
         <h3 className="text-sm font-semibold text-gray-900 mb-4">Monthly Expenses Trend (TZS)</h3>
         <ResponsiveContainer width="100%" height={160}>
-          <LineChart data={mockExpensesByMonth} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+          <LineChart data={[]} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
             <XAxis dataKey="month" tick={{ fontSize: 11 }} />
             <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${(v / 1000000).toFixed(0)}M`} />

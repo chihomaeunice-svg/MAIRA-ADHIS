@@ -8,7 +8,7 @@ import {
   collection, addDoc, getDocs, query, orderBy, Timestamp,
 } from 'firebase/firestore';
 import { db } from '@/firebase';
-import { mockCorrespondence } from '@/data/mockData';
+
 import { Correspondence, CorrespondenceType } from '@/types';
 import { formatDate } from '@/lib/utils';
 import { useUIStore } from '@/stores/uiStore';
@@ -102,36 +102,10 @@ const CorrespondencePage: React.FC = () => {
           };
         }));
       } else {
-        const mapped: FirestoreCorrespondence[] = (mockCorrespondence as Correspondence[]).map((c) => ({
-          id: c.id,
-          type: c.type,
-          reference: c.reference,
-          subject: c.subject,
-          fromParty: c.fromParty,
-          toParty: c.toParty,
-          date: c.date instanceof Date ? c.date.toISOString().split('T')[0] : String(c.date),
-          direction: c.direction,
-          relatedCaseId: c.relatedCaseId,
-          content: undefined,
-          createdAt: c.date instanceof Date ? c.date : new Date(),
-        }));
-        setItems(mapped);
+        setItems([]);
       }
     } catch {
-      const mapped: FirestoreCorrespondence[] = (mockCorrespondence as Correspondence[]).map((c) => ({
-        id: c.id,
-        type: c.type,
-        reference: c.reference,
-        subject: c.subject,
-        fromParty: c.fromParty,
-        toParty: c.toParty,
-        date: c.date instanceof Date ? c.date.toISOString().split('T')[0] : String(c.date),
-        direction: c.direction,
-        relatedCaseId: c.relatedCaseId,
-        content: undefined,
-        createdAt: c.date instanceof Date ? c.date : new Date(),
-      }));
-      setItems(mapped);
+      setItems([]);
     } finally {
       setLoading(false);
     }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { FirestoreUser, UserRole } from '@/types';
 import { ROLE_LABELS, ROLE_COLORS, ROLE_PERMISSIONS } from '@/lib/permissions';
@@ -7,7 +7,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { clsx } from 'clsx';
 import {
   Users, Shield, UserCheck, Clock, Search, ChevronDown,
-  CheckCircle, XCircle, RefreshCw, Crown,
+  CheckCircle, XCircle, RefreshCw, Crown, UserPlus, Trash2, X,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -15,6 +15,8 @@ const ALL_ROLES: UserRole[] = [
   'ADMIN', 'MANAGING_PARTNER', 'ADVOCATE', 'SECRETARY',
   'ACCOUNTANT', 'PROCUREMENT_OFFICER', 'EMPLOYEE',
 ];
+
+const DEPARTMENTS = ['Management', 'Legal', 'Administration', 'Finance', 'Procurement', 'General'];
 
 const LOCAL_FALLBACK_USERS: FirestoreUser[] = [
   {
@@ -66,6 +68,18 @@ const LOCAL_FALLBACK_USERS: FirestoreUser[] = [
   },
 ];
 
+interface AddUserForm {
+  name: string;
+  email: string;
+  role: UserRole;
+  department: string;
+  phone: string;
+}
+
+const defaultAddForm = (): AddUserForm => ({
+  name: '', email: '', role: 'EMPLOYEE', department: 'General', phone: '',
+});
+
 const UserManagementPage: React.FC = () => {
   const { user: currentUser, isLocalSession } = useAuthStore();
   const [users, setUsers] = useState<FirestoreUser[]>([]);
@@ -74,6 +88,10 @@ const UserManagementPage: React.FC = () => {
   const [roleFilter, setRoleFilter] = useState<UserRole | 'ALL'>('ALL');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [openRoleDropdown, setOpenRoleDropdown] = useState<string | null>(null);
+  const [showAddUser, setShowAddUser] = useState(false);
+  const [addForm, setAddForm] = useState<AddUserForm>(defaultAddForm());
+  const [addingUser, setAddingUser] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -111,10 +129,7 @@ const UserManagementPage: React.FC = () => {
     setUpdatingId(uid);
     setOpenRoleDropdown(null);
     try {
-      await updateDoc(doc(db, 'users', uid), {
-        role: newRole,
-        updatedAt: serverTimestamp(),
-      });
+      await updateDoc(doc(db, 'users', uid), { role: newRole, updatedAt: serverTimestamp() });
       setUsers(prev => prev.map(u => u.uid === uid ? { ...u, role: newRole } : u));
       toast.success(`Role updated to ${ROLE_LABELS[newRole]}`);
     } catch {
@@ -132,16 +147,71 @@ const UserManagementPage: React.FC = () => {
     const newStatus = currentStatus === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
     setUpdatingId(uid);
     try {
-      await updateDoc(doc(db, 'users', uid), {
-        status: newStatus,
-        updatedAt: serverTimestamp(),
-      });
+      await updateDoc(doc(db, 'users', uid), { status: newStatus, updatedAt: serverTimestamp() });
       setUsers(prev => prev.map(u => u.uid === uid ? { ...u, status: newStatus as 'ACTIVE' | 'INACTIVE' } : u));
       toast.success(`Account ${newStatus === 'ACTIVE' ? 'activated' : 'deactivated'}`);
     } catch {
       toast.error('Failed to update status');
     } finally {
       setUpdatingId(null);
+    }
+  };
+
+  const handleAddUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addForm.name.trim()) { toast.error('Name is required'); return; }
+    if (!addForm.email.trim()) { toast.error('Email is required'); return; }
+    setAddingUser(true);
+    try {
+      const uid = `manual-${Date.now()}`;
+      const newUser = {
+        name: addForm.name.trim(),
+        email: addForm.email.trim().toLowerCase(),
+        role: addForm.role,
+        department: addForm.department || null,
+        phone: addForm.phone.trim() || null,
+        status: 'ACTIVE',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+      await setDoc(doc(db, 'users', uid), newUser);
+      setUsers(prev => [...prev, {
+        uid,
+        name: addForm.name.trim(),
+        email: addForm.email.trim().toLowerCase(),
+        role: addForm.role,
+        department: addForm.department || undefined,
+        phone: addForm.phone.trim() || undefined,
+        status: 'ACTIVE' as const,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }].sort((a, b) => ALL_ROLES.indexOf(a.role) - ALL_ROLES.indexOf(b.role)));
+      toast.success(`${addForm.name} added to the system`);
+      setShowAddUser(false);
+      setAddForm(defaultAddForm());
+    } catch {
+      toast.error('Failed to add user');
+    } finally {
+      setAddingUser(false);
+    }
+  };
+
+  const handleDeleteUser = async (uid: string) => {
+    if (uid === currentUser?.id) {
+      toast.error('You cannot delete your own account.');
+      setDeleteConfirmId(null);
+      return;
+    }
+    setUpdatingId(uid);
+    try {
+      await deleteDoc(doc(db, 'users', uid));
+      setUsers(prev => prev.filter(u => u.uid !== uid));
+      toast.success('User removed');
+    } catch {
+      toast.error('Failed to remove user');
+    } finally {
+      setUpdatingId(null);
+      setDeleteConfirmId(null);
     }
   };
 
@@ -177,13 +247,22 @@ const UserManagementPage: React.FC = () => {
           <h2 className="text-xl font-bold text-gray-900">User Management</h2>
           <p className="text-sm text-gray-500 mt-0.5">Manage staff accounts and role permissions</p>
         </div>
-        <button
-          onClick={fetchUsers}
-          className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-        >
-          <RefreshCw className="h-4 w-4 text-gray-500" />
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={fetchUsers}
+            className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <RefreshCw className="h-4 w-4 text-gray-500" />
+            Refresh
+          </button>
+          <button
+            onClick={() => setShowAddUser(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
+          >
+            <UserPlus className="h-4 w-4" />
+            Add User
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -225,9 +304,7 @@ const UserManagementPage: React.FC = () => {
               onClick={() => setRoleFilter(r as UserRole | 'ALL')}
               className={clsx(
                 'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
-                roleFilter === r
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                roleFilter === r ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               )}
             >
               {r === 'ALL' ? 'All Users' : ROLE_LABELS[r as UserRole]}
@@ -253,9 +330,7 @@ const UserManagementPage: React.FC = () => {
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   {['Staff Member', 'Role', 'Access Level', 'Status', 'Last Login', 'Actions'].map(h => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                      {h}
-                    </th>
+                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -326,9 +401,7 @@ const UserManagementPage: React.FC = () => {
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1 max-w-[180px]">
                         {(ROLE_PERMISSIONS[u.role] || []).slice(0, 3).map(p => (
-                          <span key={p} className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded capitalize">
-                            {p}
-                          </span>
+                          <span key={p} className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded capitalize">{p}</span>
                         ))}
                         {ROLE_PERMISSIONS[u.role]?.length > 3 && (
                           <span className="text-xs text-gray-400">+{ROLE_PERMISSIONS[u.role].length - 3} more</span>
@@ -342,10 +415,7 @@ const UserManagementPage: React.FC = () => {
                         'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium',
                         u.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
                       )}>
-                        {u.status === 'ACTIVE'
-                          ? <CheckCircle className="h-3 w-3" />
-                          : <XCircle className="h-3 w-3" />
-                        }
+                        {u.status === 'ACTIVE' ? <CheckCircle className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
                         {u.status}
                       </span>
                     </td>
@@ -357,18 +427,46 @@ const UserManagementPage: React.FC = () => {
 
                     {/* Actions */}
                     <td className="px-4 py-3">
-                      <button
-                        onClick={() => handleStatusToggle(u.uid, u.status)}
-                        disabled={updatingId === u.uid || u.uid === currentUser?.id}
-                        className={clsx(
-                          'text-xs px-3 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
-                          u.status === 'ACTIVE'
-                            ? 'bg-red-50 text-red-600 hover:bg-red-100'
-                            : 'bg-green-50 text-green-600 hover:bg-green-100'
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleStatusToggle(u.uid, u.status)}
+                          disabled={updatingId === u.uid || u.uid === currentUser?.id}
+                          className={clsx(
+                            'text-xs px-3 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
+                            u.status === 'ACTIVE'
+                              ? 'bg-red-50 text-red-600 hover:bg-red-100'
+                              : 'bg-green-50 text-green-600 hover:bg-green-100'
+                          )}
+                        >
+                          {u.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
+                        </button>
+
+                        {deleteConfirmId === u.uid ? (
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleDeleteUser(u.uid)}
+                              className="text-xs px-2 py-1.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700"
+                            >
+                              Confirm
+                            </button>
+                            <button
+                              onClick={() => setDeleteConfirmId(null)}
+                              className="text-xs px-2 py-1.5 bg-gray-100 text-gray-600 rounded-lg font-medium hover:bg-gray-200"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setDeleteConfirmId(u.uid)}
+                            disabled={updatingId === u.uid || u.uid === currentUser?.id}
+                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                            title="Delete user"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
                         )}
-                      >
-                        {u.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
-                      </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -389,6 +487,96 @@ const UserManagementPage: React.FC = () => {
           </p>
         </div>
       </div>
+
+      {/* Add User Modal */}
+      {showAddUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Add Staff Member</h2>
+              <button onClick={() => { setShowAddUser(false); setAddForm(defaultAddForm()); }} className="p-1.5 rounded-lg hover:bg-gray-100">
+                <X className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+
+            <form id="add-user-form" onSubmit={handleAddUser} className="px-6 py-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
+                <input
+                  type="text"
+                  value={addForm.name}
+                  onChange={e => setAddForm(f => ({ ...f, name: e.target.value }))}
+                  placeholder="e.g. Adv. Jane Doe"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email Address *</label>
+                <input
+                  type="email"
+                  value={addForm.email}
+                  onChange={e => setAddForm(f => ({ ...f, email: e.target.value }))}
+                  placeholder="e.g. jane.doe@maca.co.tz"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                  <select
+                    value={addForm.role}
+                    onChange={e => setAddForm(f => ({ ...f, role: e.target.value as UserRole }))}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                  >
+                    {ALL_ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                  <select
+                    value={addForm.department}
+                    onChange={e => setAddForm(f => ({ ...f, department: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                  >
+                    {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Phone (optional)</label>
+                <input
+                  type="tel"
+                  value={addForm.phone}
+                  onChange={e => setAddForm(f => ({ ...f, phone: e.target.value }))}
+                  placeholder="+255 7XX XXX XXX"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                After adding, also create a Firebase Auth account for this person in the Firebase Console so they can log in.
+              </p>
+            </form>
+
+            <div className="flex gap-3 px-6 py-4 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={() => { setShowAddUser(false); setAddForm(defaultAddForm()); }}
+                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="add-user-form"
+                disabled={addingUser}
+                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {addingUser ? 'Adding...' : 'Add User'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
