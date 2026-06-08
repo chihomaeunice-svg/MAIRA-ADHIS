@@ -1,8 +1,14 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Scale, ArrowLeft, Phone, Mail, MapPin, Send, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Phone, Mail, MapPin, Send, CheckCircle } from 'lucide-react';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import emailjs from '@emailjs/browser';
 import { db } from '@/firebase';
+
+// EmailJS credentials — set these in your .env file (VITE_EMAILJS_*)
+const EMAILJS_SERVICE_ID  = import.meta.env.VITE_EMAILJS_SERVICE_ID  || '';
+const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || '';
+const EMAILJS_PUBLIC_KEY  = import.meta.env.VITE_EMAILJS_PUBLIC_KEY  || '';
 
 const ContactPage: React.FC = () => {
   const [form, setForm] = useState({ name: '', email: '', phone: '', subject: '', message: '' });
@@ -18,25 +24,39 @@ const ContactPage: React.FC = () => {
     }
     setSending(true);
     setError('');
+
+    const subject = form.subject.trim() || 'General Enquiry';
+
     try {
+      // Save to Firestore so staff can view it in the system
       await addDoc(collection(db, 'contactMessages'), {
         name: form.name.trim(),
         email: form.email.trim(),
         phone: form.phone.trim() || null,
-        subject: form.subject.trim() || 'General Enquiry',
+        subject,
         message: form.message.trim(),
         read: false,
         createdAt: serverTimestamp(),
       });
-      // Create a notification for staff
-      await addDoc(collection(db, 'notifications'), {
-        title: 'New Contact Enquiry',
-        message: `${form.name.trim()} sent a message: "${form.subject.trim() || 'General Enquiry'}"`,
-        type: 'message',
-        read: false,
-        link: '/messages',
-        createdAt: serverTimestamp(),
-      });
+
+      // Send email notification via EmailJS (only if credentials are configured)
+      if (EMAILJS_SERVICE_ID && EMAILJS_TEMPLATE_ID && EMAILJS_PUBLIC_KEY) {
+        await emailjs.send(
+          EMAILJS_SERVICE_ID,
+          EMAILJS_TEMPLATE_ID,
+          {
+            from_name:    form.name.trim(),
+            from_email:   form.email.trim(),
+            phone:        form.phone.trim() || 'Not provided',
+            subject,
+            message:      form.message.trim(),
+            to_email:     'info@maca.co.tz',
+            reply_to:     form.email.trim(),
+          },
+          EMAILJS_PUBLIC_KEY
+        );
+      }
+
       setSent(true);
       setForm({ name: '', email: '', phone: '', subject: '', message: '' });
     } catch {

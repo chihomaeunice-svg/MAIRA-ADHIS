@@ -5,7 +5,6 @@ import {
   collection, addDoc, getDocs, query, orderBy, Timestamp, deleteDoc, doc,
 } from 'firebase/firestore';
 import { db } from '@/firebase';
-import { mockEmployees } from '@/data/mockData';
 import { Case, CaseStatus } from '@/types';
 import { formatDate, getStatusColor } from '@/lib/utils';
 import { useUIStore } from '@/stores/uiStore';
@@ -92,6 +91,8 @@ const defaultForm = (): NewCaseForm => ({
   status: 'NEW',
 });
 
+interface StaffOption { id: string; name: string; }
+
 const CasesPage: React.FC = () => {
   const { setPageTitle } = useUIStore();
   const { user } = useAuthStore();
@@ -105,8 +106,19 @@ const CasesPage: React.FC = () => {
   const [form, setForm] = useState<NewCaseForm>(defaultForm());
   const [saving, setSaving] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [advocates, setAdvocates] = useState<StaffOption[]>([]);
 
   useEffect(() => { setPageTitle('Cases'); }, [setPageTitle]);
+
+  useEffect(() => {
+    getDocs(collection(db, 'users')).then(snap => {
+      const staff = snap.docs
+        .map(d => ({ id: d.id, name: d.data().name as string, role: d.data().role as string }))
+        .filter(u => ['ADVOCATE', 'ADMIN', 'MANAGING_PARTNER'].includes(u.role))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      setAdvocates(staff);
+    }).catch(() => {});
+  }, []);
 
   const fetchCases = useCallback(async () => {
     setLoading(true);
@@ -184,12 +196,8 @@ const CasesPage: React.FC = () => {
   };
 
   const handleAdvocateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const emp = mockEmployees.find((em) => em.id === e.target.value);
-    setForm((p) => ({
-      ...p,
-      advocateId: emp?.id || '',
-      advocateName: emp?.fullName || '',
-    }));
+    const adv = advocates.find(a => a.id === e.target.value);
+    setForm(p => ({ ...p, advocateId: adv?.id || '', advocateName: adv?.name || '' }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -533,8 +541,8 @@ const CasesPage: React.FC = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                   >
                     <option value="">— Select Advocate —</option>
-                    {mockEmployees.map((emp) => (
-                      <option key={emp.id} value={emp.id}>{emp.fullName}</option>
+                    {advocates.map(adv => (
+                      <option key={adv.id} value={adv.id}>{adv.name}</option>
                     ))}
                   </select>
                 </div>
