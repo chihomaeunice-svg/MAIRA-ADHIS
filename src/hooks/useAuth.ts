@@ -15,7 +15,7 @@ import toast from 'react-hot-toast';
 // Hardcoded bootstrap credentials for the initial firm admins.
 // On first login these auto-create a real Firebase Auth + Firestore account.
 const LOCAL_STAFF: Record<string, { password: string; name: string; role: UserRole; department: string }> = {
-  'admin1@maca.co.tz':          { password: 'Admin@Maira2024', name: 'Adv. Maira Hassan',  role: 'ADMIN',               department: 'Management'    },
+  'ritachihoma@gmail.com':       { password: 'Admin1@Maira',    name: 'Rita Chihoma',        role: 'ADMIN',               department: 'Management'    },
   'admin2@maca.co.tz':          { password: 'Admin@Adhis2024', name: 'Adv. Adhis Nkrumah', role: 'ADMIN',               department: 'Management'    },
   'james.kimani@maca.co.tz':    { password: 'Staff@2024!',     name: 'James Kimani',        role: 'ADVOCATE',            department: 'Legal'         },
   'florence.mwangi@maca.co.tz': { password: 'Staff@2024!',     name: 'Florence Mwangi',     role: 'SECRETARY',           department: 'Administration'},
