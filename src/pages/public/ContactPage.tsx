@@ -2,13 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Phone, Mail, MapPin, Send, CheckCircle } from 'lucide-react';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import emailjs from '@emailjs/browser';
 import { db } from '@/firebase';
-
-// EmailJS credentials — set these in your .env file (VITE_EMAILJS_*)
-const EMAILJS_SERVICE_ID  = import.meta.env.VITE_EMAILJS_SERVICE_ID  || '';
-const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || '';
-const EMAILJS_PUBLIC_KEY  = import.meta.env.VITE_EMAILJS_PUBLIC_KEY  || '';
 
 const ContactPage: React.FC = () => {
   const [form, setForm] = useState({ name: '', email: '', phone: '', subject: '', message: '' });
@@ -38,24 +32,6 @@ const ContactPage: React.FC = () => {
         read: false,
         createdAt: serverTimestamp(),
       });
-
-      // Send email notification via EmailJS (only if credentials are configured)
-      if (EMAILJS_SERVICE_ID && EMAILJS_TEMPLATE_ID && EMAILJS_PUBLIC_KEY) {
-        await emailjs.send(
-          EMAILJS_SERVICE_ID,
-          EMAILJS_TEMPLATE_ID,
-          {
-            from_name:    form.name.trim(),
-            from_email:   form.email.trim(),
-            phone:        form.phone.trim() || 'Not provided',
-            subject,
-            message:      form.message.trim(),
-            to_email:     'info@maca.co.tz',
-            reply_to:     form.email.trim(),
-          },
-          EMAILJS_PUBLIC_KEY
-        );
-      }
 
       setSent(true);
       setForm({ name: '', email: '', phone: '', subject: '', message: '' });
