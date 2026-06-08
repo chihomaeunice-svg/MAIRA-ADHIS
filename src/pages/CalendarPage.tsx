@@ -7,8 +7,7 @@ import {
   collection, addDoc, getDocs, query, orderBy, Timestamp,
 } from 'firebase/firestore';
 import { db } from '@/firebase';
-import { mockCalendarEvents } from '@/data/mockData';
-import { CalendarEvent, CalendarEventType } from '@/types';
+import { CalendarEventType } from '@/types';
 import { formatDate } from '@/lib/utils';
 import { useUIStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -88,30 +87,10 @@ const CalendarPage: React.FC = () => {
           };
         }));
       } else {
-        const mapped: FirestoreEvent[] = (mockCalendarEvents as CalendarEvent[]).map((e) => ({
-          id: e.id,
-          title: e.title,
-          date: e.date instanceof Date ? e.date.toISOString().split('T')[0] : String(e.date),
-          type: e.type,
-          location: e.location,
-          relatedCaseId: e.relatedCaseId,
-          notes: e.notes,
-          createdAt: e.date instanceof Date ? e.date : new Date(),
-        }));
-        setEvents(mapped);
+        setEvents([]);
       }
     } catch {
-      const mapped: FirestoreEvent[] = (mockCalendarEvents as CalendarEvent[]).map((e) => ({
-        id: e.id,
-        title: e.title,
-        date: e.date instanceof Date ? e.date.toISOString().split('T')[0] : String(e.date),
-        type: e.type,
-        location: e.location,
-        relatedCaseId: e.relatedCaseId,
-        notes: e.notes,
-        createdAt: e.date instanceof Date ? e.date : new Date(),
-      }));
-      setEvents(mapped);
+      setEvents([]);
     } finally {
       setLoading(false);
     }

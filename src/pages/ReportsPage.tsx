@@ -11,9 +11,6 @@ import {
   collection, getDocs, query, orderBy,
 } from 'firebase/firestore';
 import { db } from '@/firebase';
-import {
-  mockCases, mockClients, mockEmployees, mockExpenses, mockMonthlyStats,
-} from '@/data/mockData';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import { clsx } from 'clsx';
 
@@ -121,12 +118,43 @@ interface DocRecord {
   createdAt: string;
 }
 
+interface StaffUser {
+  id: string;
+  name: string;
+  role: string;
+  department: string;
+  email: string;
+  phone: string;
+  status: string;
+}
+
+interface ClientRecord {
+  id: string;
+  fullName: string;
+  clientType: string;
+  phone: string;
+  email: string;
+  address: string;
+  caseCount: number;
+}
+
+const ROLE_LABELS: Record<string, string> = {
+  ADMIN: 'Admin',
+  MANAGING_PARTNER: 'Managing Partner',
+  ADVOCATE: 'Advocate',
+  SECRETARY: 'Secretary',
+  ACCOUNTANT: 'Accountant',
+  PROCUREMENT_OFFICER: 'Procurement Officer',
+};
+
 const ReportsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabId>('cases');
   const [cases, setCases] = useState<FirestoreCase[]>([]);
   const [expenses, setExpenses] = useState<FirestoreExpense[]>([]);
   const [income, setIncome] = useState<IncomeRecord[]>([]);
   const [documents, setDocuments] = useState<DocRecord[]>([]);
+  const [staffUsers, setStaffUsers] = useState<StaffUser[]>([]);
+  const [clientRecords, setClientRecords] = useState<ClientRecord[]>([]);
   const [docCategoryFilter, setDocCategoryFilter] = useState('ALL');
   const [loading, setLoading] = useState(true);
 
@@ -150,18 +178,10 @@ const ReportsPage: React.FC = () => {
           };
         }));
       } else {
-        setCases(mockCases.map((c) => ({
-          id: c.id, caseNumber: c.caseNumber, title: c.title, status: c.status,
-          category: c.category, advocateName: c.advocateName, clientName: c.clientName,
-          filingDate: c.filingDate.toISOString(),
-        })));
+        setCases([]);
       }
     } catch {
-      setCases(mockCases.map((c) => ({
-        id: c.id, caseNumber: c.caseNumber, title: c.title, status: c.status,
-        category: c.category, advocateName: c.advocateName, clientName: c.clientName,
-        filingDate: c.filingDate.toISOString(),
-      })));
+      setCases([]);
     }
 
     try {
@@ -172,18 +192,10 @@ const ReportsPage: React.FC = () => {
           return { id: d.id, date: data.date, category: data.category, description: data.description, amount: data.amount, approvedBy: data.approvedBy };
         }));
       } else {
-        setExpenses(mockExpenses.map((e) => ({
-          id: e.id,
-          date: e.date instanceof Date ? e.date.toISOString().split('T')[0] : String(e.date),
-          category: e.category, description: e.description, amount: e.amount, approvedBy: e.approvedBy,
-        })));
+        setExpenses([]);
       }
     } catch {
-      setExpenses(mockExpenses.map((e) => ({
-        id: e.id,
-        date: e.date instanceof Date ? e.date.toISOString().split('T')[0] : String(e.date),
-        category: e.category, description: e.description, amount: e.amount, approvedBy: e.approvedBy,
-      })));
+      setExpenses([]);
     }
 
     try {
@@ -206,6 +218,25 @@ const ReportsPage: React.FC = () => {
       }));
     } catch { setDocuments([]); }
 
+    try {
+      const usersSnap = await getDocs(collection(db, 'users'));
+      setStaffUsers(usersSnap.docs.map((d) => {
+        const data = d.data();
+        return { id: d.id, name: data.name, role: data.role, department: data.department || '', email: data.email, phone: data.phone || '', status: data.status || 'ACTIVE' };
+      }));
+    } catch { setStaffUsers([]); }
+
+    try {
+      const clientsSnap = await getDocs(collection(db, 'clients'));
+      const allCasesSnap = await getDocs(collection(db, 'cases'));
+      const casesPerClient: Record<string, number> = {};
+      allCasesSnap.docs.forEach((d) => { const cid = d.data().clientId; if (cid) casesPerClient[cid] = (casesPerClient[cid] || 0) + 1; });
+      setClientRecords(clientsSnap.docs.map((d) => {
+        const data = d.data();
+        return { id: d.id, fullName: data.fullName, clientType: data.clientType, phone: data.phone, email: data.email, address: data.address || '', caseCount: casesPerClient[d.id] || 0 };
+      }));
+    } catch { setClientRecords([]); }
+
     setLoading(false);
   }, []);
 
@@ -225,6 +256,12 @@ const ReportsPage: React.FC = () => {
 
   // Monthly income vs expenses chart data
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  const monthlyStats = months.map((month, idx) => ({
+    month,
+    cases: cases.filter((c) => new Date(c.filingDate).getMonth() === idx).length,
+    completed: cases.filter((c) => new Date(c.filingDate).getMonth() === idx && c.status === 'COMPLETED').length,
+  }));
   const financialChartData = months.map((month, idx) => {
     const monthIncome = income.filter((i) => new Date(i.date).getMonth() === idx).reduce((s, i) => s + i.amount, 0);
     const monthExpense = expenses.filter((e) => new Date(e.date).getMonth() === idx).reduce((s, e) => s + e.amount, 0);
@@ -318,7 +355,7 @@ const ReportsPage: React.FC = () => {
               <div className="bg-white rounded-xl border border-gray-200 p-5">
                 <h3 className="text-base font-semibold text-gray-900 mb-4">Monthly Case Filings 2024</h3>
                 <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={mockMonthlyStats}>
+                  <BarChart data={monthlyStats}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 11 }} />
@@ -584,9 +621,9 @@ const ReportsPage: React.FC = () => {
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Employee Report</h2>
             <div className="grid md:grid-cols-3 gap-4 mb-5">
               {[
-                { label: 'Total Staff', value: mockEmployees.length },
-                { label: 'Legal Department', value: mockEmployees.filter((e) => e.department === 'Legal').length },
-                { label: 'Admin/Finance', value: mockEmployees.filter((e) => e.department !== 'Legal').length },
+                { label: 'Total Staff', value: staffUsers.length },
+                { label: 'Legal Department', value: staffUsers.filter((e) => e.department === 'Legal').length },
+                { label: 'Other Departments', value: staffUsers.filter((e) => e.department !== 'Legal').length },
               ].map((stat) => (
                 <div key={stat.label} className="bg-white rounded-xl border border-gray-200 p-4 text-center">
                   <p className="text-3xl font-bold text-primary-600">{stat.value}</p>
@@ -599,25 +636,26 @@ const ReportsPage: React.FC = () => {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50 border-b">
-                      {['Name', 'Position', 'Department', 'Email', 'Phone', 'Status', 'Leave Balance'].map((h) => (
+                      {['Name', 'Role', 'Department', 'Email', 'Phone', 'Status'].map((h) => (
                         <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {mockEmployees.map((e) => (
+                    {staffUsers.length === 0 ? (
+                      <tr><td colSpan={6} className="px-5 py-8 text-center text-gray-400 text-sm">No staff records found</td></tr>
+                    ) : staffUsers.map((e) => (
                       <tr key={e.id} className="hover:bg-gray-50">
-                        <td className="px-5 py-3 font-medium text-gray-900">{e.fullName}</td>
-                        <td className="px-5 py-3 text-gray-600">{e.position}</td>
-                        <td className="px-5 py-3 text-gray-600">{e.department}</td>
+                        <td className="px-5 py-3 font-medium text-gray-900">{e.name}</td>
+                        <td className="px-5 py-3 text-gray-600">{ROLE_LABELS[e.role] || e.role}</td>
+                        <td className="px-5 py-3 text-gray-600">{e.department || '—'}</td>
                         <td className="px-5 py-3 text-gray-500 text-xs">{e.email}</td>
-                        <td className="px-5 py-3 text-gray-500 text-xs">{e.phone}</td>
+                        <td className="px-5 py-3 text-gray-500 text-xs">{e.phone || '—'}</td>
                         <td className="px-5 py-3">
                           <span className={clsx('text-xs px-2 py-0.5 rounded-full font-medium', e.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600')}>
                             {e.status}
                           </span>
                         </td>
-                        <td className="px-5 py-3 text-gray-600">{e.leaveBalance} days</td>
                       </tr>
                     ))}
                   </tbody>
@@ -643,9 +681,9 @@ const ReportsPage: React.FC = () => {
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Client Report</h2>
             <div className="grid md:grid-cols-3 gap-4 mb-5">
               {[
-                { label: 'Total Clients', value: mockClients.length },
-                { label: 'Individual', value: mockClients.filter((c) => c.clientType === 'INDIVIDUAL').length },
-                { label: 'Corporate', value: mockClients.filter((c) => c.clientType === 'CORPORATE').length },
+                { label: 'Total Clients', value: clientRecords.length },
+                { label: 'Individual', value: clientRecords.filter((c) => c.clientType === 'INDIVIDUAL').length },
+                { label: 'Corporate', value: clientRecords.filter((c) => c.clientType === 'CORPORATE').length },
               ].map((stat) => (
                 <div key={stat.label} className="bg-white rounded-xl border border-gray-200 p-4 text-center">
                   <p className="text-3xl font-bold text-primary-600">{stat.value}</p>
@@ -664,7 +702,9 @@ const ReportsPage: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {mockClients.map((c) => (
+                    {clientRecords.length === 0 ? (
+                      <tr><td colSpan={6} className="px-5 py-8 text-center text-gray-400 text-sm">No client records found</td></tr>
+                    ) : clientRecords.map((c) => (
                       <tr key={c.id} className="hover:bg-gray-50">
                         <td className="px-5 py-3 font-medium text-gray-900">{c.fullName}</td>
                         <td className="px-5 py-3">
@@ -675,7 +715,7 @@ const ReportsPage: React.FC = () => {
                         <td className="px-5 py-3 text-gray-500 text-xs">{c.phone}</td>
                         <td className="px-5 py-3 text-gray-500 text-xs">{c.email}</td>
                         <td className="px-5 py-3 text-gray-500 text-xs max-w-[160px] truncate">{c.address}</td>
-                        <td className="px-5 py-3 text-gray-600 font-medium">{c.cases.length}</td>
+                        <td className="px-5 py-3 text-gray-600 font-medium">{c.caseCount}</td>
                       </tr>
                     ))}
                   </tbody>

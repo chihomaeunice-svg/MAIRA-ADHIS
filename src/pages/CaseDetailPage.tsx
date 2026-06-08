@@ -7,7 +7,6 @@ import {
 } from 'lucide-react';
 import { collection, query, where, getDocs, doc, getDoc, updateDoc, arrayUnion, Timestamp } from 'firebase/firestore';
 import { db } from '@/firebase';
-import { mockCases } from '@/data/mockData';
 import { Case, CaseStatus, HearingDate, Note } from '@/types';
 import { formatDate, getStatusColor } from '@/lib/utils';
 import { useAuthStore } from '@/stores/authStore';
@@ -49,22 +48,16 @@ const CaseDetailPage: React.FC = () => {
   const loadCase = async () => {
     setLoading(true);
     try {
-      // Try Firestore first
-      if (id && !id.startsWith('case-')) {
+      if (id) {
         const docRef = doc(db, 'cases', id);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           const data = docSnap.data();
           setCaseData({ id: docSnap.id, ...data, filingDate: data.filingDate?.toDate?.() ?? new Date(data.filingDate), createdAt: data.createdAt?.toDate?.() ?? new Date(), updatedAt: data.updatedAt?.toDate?.() ?? new Date() } as Case);
           setPageTitle(`Case: ${data.caseNumber}`);
-          setLoading(false);
-          return;
         }
       }
-      // Fall back to mock data
-      const mock = mockCases.find((c) => c.id === id);
-      if (mock) { setCaseData(mock); setPageTitle(`Case: ${mock.caseNumber}`); }
-    } catch { const mock = mockCases.find((c) => c.id === id); if (mock) { setCaseData(mock); setPageTitle(`Case: ${mock.caseNumber}`); } }
+    } catch { /* case not found */ }
     setLoading(false);
   };
 
@@ -78,9 +71,7 @@ const CaseDetailPage: React.FC = () => {
     if (!caseData) return;
     setSavingEdit(true);
     try {
-      if (!caseData.id.startsWith('case-')) {
-        await updateDoc(doc(db, 'cases', caseData.id), { ...editForm, updatedAt: Timestamp.now() });
-      }
+      await updateDoc(doc(db, 'cases', caseData.id), { ...editForm, updatedAt: Timestamp.now() });
       setCaseData({ ...caseData, ...editForm });
       setEditing(false);
       toast.success('Case updated successfully');
@@ -93,9 +84,7 @@ const CaseDetailPage: React.FC = () => {
     setSavingNote(true);
     const note: Note = { id: `note-${Date.now()}`, content: noteText.trim(), authorId: user?.id || '', authorName: user?.name || 'Unknown', createdAt: new Date() };
     try {
-      if (!caseData.id.startsWith('case-')) {
-        await updateDoc(doc(db, 'cases', caseData.id), { notes: arrayUnion({ ...note, createdAt: Timestamp.now() }), updatedAt: Timestamp.now() });
-      }
+      await updateDoc(doc(db, 'cases', caseData.id), { notes: arrayUnion({ ...note, createdAt: Timestamp.now() }), updatedAt: Timestamp.now() });
       setCaseData({ ...caseData, notes: [...caseData.notes, note] });
       setNoteText('');
       toast.success('Note added');
@@ -108,9 +97,7 @@ const CaseDetailPage: React.FC = () => {
     setSavingHearing(true);
     const hearing: HearingDate = { id: `h-${Date.now()}`, date: new Date(hearingForm.date), venue: hearingForm.venue, purpose: hearingForm.purpose, outcome: hearingForm.outcome || undefined };
     try {
-      if (!caseData.id.startsWith('case-')) {
-        await updateDoc(doc(db, 'cases', caseData.id), { hearingDates: arrayUnion({ ...hearing, date: Timestamp.fromDate(hearing.date) }), updatedAt: Timestamp.now() });
-      }
+      await updateDoc(doc(db, 'cases', caseData.id), { hearingDates: arrayUnion({ ...hearing, date: Timestamp.fromDate(hearing.date) }), updatedAt: Timestamp.now() });
       setCaseData({ ...caseData, hearingDates: [...caseData.hearingDates, hearing] });
       setHearingForm({ date: '', venue: '', purpose: '', outcome: '' });
       setShowHearingForm(false);
