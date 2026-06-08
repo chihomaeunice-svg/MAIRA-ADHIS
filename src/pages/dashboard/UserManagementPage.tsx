@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/firebase';
+import {
+  collection, getDocs, doc, updateDoc, deleteDoc, setDoc, serverTimestamp,
+} from 'firebase/firestore';
+import {
+  initializeApp, deleteApp,
+} from 'firebase/app';
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { db, firebaseConfig } from '@/firebase';
 import { FirestoreUser, UserRole } from '@/types';
 import { ROLE_LABELS, ROLE_COLORS, ROLE_PERMISSIONS } from '@/lib/permissions';
 import { useAuthStore } from '@/stores/authStore';
@@ -18,70 +24,21 @@ const ALL_ROLES: UserRole[] = [
 
 const DEPARTMENTS = ['Management', 'Legal', 'Administration', 'Finance', 'Procurement', 'General'];
 
-const LOCAL_FALLBACK_USERS: FirestoreUser[] = [
-  {
-    uid: 'local-admin',
-    name: 'Admin User',
-    email: 'admin@adhisadvocates.co.tz',
-    role: 'ADMIN',
-    status: 'ACTIVE',
-    createdAt: new Date('2024-01-01'),
-    updatedAt: new Date('2024-01-01'),
-    lastLogin: new Date(),
-  },
-  {
-    uid: 'local-partner',
-    name: 'Managing Partner',
-    email: 'partner@adhisadvocates.co.tz',
-    role: 'MANAGING_PARTNER',
-    status: 'ACTIVE',
-    createdAt: new Date('2024-01-01'),
-    updatedAt: new Date('2024-01-01'),
-    lastLogin: new Date(),
-  },
-  {
-    uid: 'local-advocate',
-    name: 'Senior Advocate',
-    email: 'advocate@adhisadvocates.co.tz',
-    role: 'ADVOCATE',
-    status: 'ACTIVE',
-    createdAt: new Date('2024-02-01'),
-    updatedAt: new Date('2024-02-01'),
-  },
-  {
-    uid: 'local-secretary',
-    name: 'Office Secretary',
-    email: 'secretary@adhisadvocates.co.tz',
-    role: 'SECRETARY',
-    status: 'ACTIVE',
-    createdAt: new Date('2024-03-01'),
-    updatedAt: new Date('2024-03-01'),
-  },
-  {
-    uid: 'local-accountant',
-    name: 'Firm Accountant',
-    email: 'accountant@adhisadvocates.co.tz',
-    role: 'ACCOUNTANT',
-    status: 'ACTIVE',
-    createdAt: new Date('2024-03-01'),
-    updatedAt: new Date('2024-03-01'),
-  },
-];
-
 interface AddUserForm {
   name: string;
   email: string;
+  password: string;
   role: UserRole;
   department: string;
   phone: string;
 }
 
 const defaultAddForm = (): AddUserForm => ({
-  name: '', email: '', role: 'EMPLOYEE', department: 'General', phone: '',
+  name: '', email: '', password: '', role: 'EMPLOYEE', department: 'General', phone: '',
 });
 
 const UserManagementPage: React.FC = () => {
-  const { user: currentUser, isLocalSession } = useAuthStore();
+  const { user: currentUser } = useAuthStore();
   const [users, setUsers] = useState<FirestoreUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -92,14 +49,10 @@ const UserManagementPage: React.FC = () => {
   const [addForm, setAddForm] = useState<AddUserForm>(defaultAddForm());
   const [addingUser, setAddingUser] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const fetchUsers = async () => {
     setLoading(true);
-    if (isLocalSession) {
-      setUsers(LOCAL_FALLBACK_USERS);
-      setLoading(false);
-      return;
-    }
     try {
       const snap = await getDocs(collection(db, 'users'));
       const data = snap.docs.map(d => ({
@@ -109,11 +62,10 @@ const UserManagementPage: React.FC = () => {
         updatedAt: d.data().updatedAt?.toDate?.() ?? new Date(),
         lastLogin: d.data().lastLogin?.toDate?.() ?? null,
       })) as FirestoreUser[];
-      const sorted = data.sort((a, b) => ALL_ROLES.indexOf(a.role) - ALL_ROLES.indexOf(b.role));
-      setUsers(sorted.length > 0 ? sorted : LOCAL_FALLBACK_USERS);
+      setUsers(data.sort((a, b) => ALL_ROLES.indexOf(a.role) - ALL_ROLES.indexOf(b.role)));
     } catch {
-      toast.error('Failed to load users — showing local data');
-      setUsers(LOCAL_FALLBACK_USERS);
+      toast.error('Failed to load users');
+      setUsers([]);
     } finally {
       setLoading(false);
     }
@@ -161,9 +113,21 @@ const UserManagementPage: React.FC = () => {
     e.preventDefault();
     if (!addForm.name.trim()) { toast.error('Name is required'); return; }
     if (!addForm.email.trim()) { toast.error('Email is required'); return; }
+    if (addForm.password.length < 6) { toast.error('Password must be at least 6 characters'); return; }
+
     setAddingUser(true);
+    // Create Firebase Auth account via a secondary app instance so the admin's session is not affected
+    const secondaryApp = initializeApp(firebaseConfig, `secondary-${Date.now()}`);
+    const secondaryAuth = getAuth(secondaryApp);
+
     try {
-      const uid = `manual-${Date.now()}`;
+      const userCred = await createUserWithEmailAndPassword(
+        secondaryAuth,
+        addForm.email.trim().toLowerCase(),
+        addForm.password
+      );
+      const newUid = userCred.user.uid;
+
       const newUser = {
         name: addForm.name.trim(),
         email: addForm.email.trim().toLowerCase(),
@@ -174,9 +138,11 @@ const UserManagementPage: React.FC = () => {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
-      await setDoc(doc(db, 'users', uid), newUser);
+
+      await setDoc(doc(db, 'users', newUid), newUser);
+
       setUsers(prev => [...prev, {
-        uid,
+        uid: newUid,
         name: addForm.name.trim(),
         email: addForm.email.trim().toLowerCase(),
         role: addForm.role,
@@ -186,13 +152,22 @@ const UserManagementPage: React.FC = () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       }].sort((a, b) => ALL_ROLES.indexOf(a.role) - ALL_ROLES.indexOf(b.role)));
-      toast.success(`${addForm.name} added to the system`);
+
+      toast.success(`${addForm.name} added successfully`);
       setShowAddUser(false);
       setAddForm(defaultAddForm());
-    } catch {
-      toast.error('Failed to add user');
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code;
+      if (code === 'auth/email-already-in-use') {
+        toast.error('An account with this email already exists');
+      } else if (code === 'auth/invalid-email') {
+        toast.error('Invalid email address');
+      } else {
+        toast.error('Failed to add user. Please try again.');
+      }
     } finally {
       setAddingUser(false);
+      await deleteApp(secondaryApp);
     }
   };
 
@@ -270,7 +245,7 @@ const UserManagementPage: React.FC = () => {
         {[
           { label: 'Total Staff', value: stats.total, icon: Users, color: 'text-blue-600 bg-blue-50' },
           { label: 'Active', value: stats.active, icon: CheckCircle, color: 'text-green-600 bg-green-50' },
-          { label: 'Pending Role', value: stats.pending, icon: Clock, color: 'text-amber-600 bg-amber-50' },
+          { label: 'Employees', value: stats.pending, icon: Clock, color: 'text-amber-600 bg-amber-50' },
           { label: 'Administrators', value: stats.admins, icon: Crown, color: 'text-red-600 bg-red-50' },
         ].map(s => (
           <div key={s.label} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
@@ -323,6 +298,7 @@ const UserManagementPage: React.FC = () => {
           <div className="text-center py-16">
             <Users className="h-10 w-10 text-gray-300 mx-auto mb-3" />
             <p className="text-gray-500 text-sm">No users found</p>
+            <p className="text-gray-400 text-xs mt-1">Click "Add User" to create the first staff account</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -337,7 +313,6 @@ const UserManagementPage: React.FC = () => {
               <tbody className="divide-y divide-gray-100">
                 {filtered.map(u => (
                   <tr key={u.uid} className={clsx('hover:bg-gray-50 transition-colors', updatingId === u.uid && 'opacity-60')}>
-                    {/* Staff Member */}
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className={clsx(
@@ -355,11 +330,11 @@ const UserManagementPage: React.FC = () => {
                             {u.role === 'ADMIN' && <Crown className="h-3.5 w-3.5 text-yellow-500" />}
                           </div>
                           <p className="text-xs text-gray-500">{u.email}</p>
+                          {u.phone && <p className="text-xs text-gray-400">{u.phone}</p>}
                         </div>
                       </div>
                     </td>
 
-                    {/* Role with dropdown */}
                     <td className="px-4 py-3">
                       <div className="relative">
                         <button
@@ -375,29 +350,31 @@ const UserManagementPage: React.FC = () => {
                           <ChevronDown className="h-3 w-3" />
                         </button>
                         {openRoleDropdown === u.uid && (
-                          <div className="absolute top-8 left-0 z-50 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[200px]">
-                            <p className="px-3 py-1.5 text-xs text-gray-400 font-medium uppercase tracking-wide border-b border-gray-100 mb-1">
-                              Change Role
-                            </p>
-                            {ALL_ROLES.map(role => (
-                              <button
-                                key={role}
-                                onClick={() => handleRoleChange(u.uid, role)}
-                                className={clsx(
-                                  'w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-gray-50 transition-colors',
-                                  u.role === role && 'bg-primary-50 text-primary-700'
-                                )}
-                              >
-                                <span>{ROLE_LABELS[role]}</span>
-                                {u.role === role && <CheckCircle className="h-3.5 w-3.5 text-primary-600" />}
-                              </button>
-                            ))}
-                          </div>
+                          <>
+                            <div className="fixed inset-0 z-40" onClick={() => setOpenRoleDropdown(null)} />
+                            <div className="absolute top-8 left-0 z-50 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[200px]">
+                              <p className="px-3 py-1.5 text-xs text-gray-400 font-medium uppercase tracking-wide border-b border-gray-100 mb-1">
+                                Change Role
+                              </p>
+                              {ALL_ROLES.map(role => (
+                                <button
+                                  key={role}
+                                  onClick={() => handleRoleChange(u.uid, role)}
+                                  className={clsx(
+                                    'w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-gray-50 transition-colors',
+                                    u.role === role && 'bg-primary-50 text-primary-700'
+                                  )}
+                                >
+                                  <span>{ROLE_LABELS[role]}</span>
+                                  {u.role === role && <CheckCircle className="h-3.5 w-3.5 text-primary-600" />}
+                                </button>
+                              ))}
+                            </div>
+                          </>
                         )}
                       </div>
                     </td>
 
-                    {/* Access level */}
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1 max-w-[180px]">
                         {(ROLE_PERMISSIONS[u.role] || []).slice(0, 3).map(p => (
@@ -409,7 +386,6 @@ const UserManagementPage: React.FC = () => {
                       </div>
                     </td>
 
-                    {/* Status */}
                     <td className="px-4 py-3">
                       <span className={clsx(
                         'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium',
@@ -420,12 +396,10 @@ const UserManagementPage: React.FC = () => {
                       </span>
                     </td>
 
-                    {/* Last Login */}
                     <td className="px-4 py-3 text-xs text-gray-500">
                       {formatLastLogin(u.lastLogin)}
                     </td>
 
-                    {/* Actions */}
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <button
@@ -476,14 +450,13 @@ const UserManagementPage: React.FC = () => {
         )}
       </div>
 
-      {/* Info box */}
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
-        <Shield className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
+        <Shield className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
         <div className="text-sm">
-          <p className="font-semibold text-amber-800">Role Change Notice</p>
-          <p className="text-amber-700 mt-0.5">
-            New staff members are assigned the <strong>Employee</strong> role by default with limited access.
-            Click on a role badge to change it. Changes take effect on the user's next login.
+          <p className="font-semibold text-blue-800">User Accounts</p>
+          <p className="text-blue-700 mt-0.5">
+            New users are created directly here — no external setup needed. Their login credentials are the email and password you provide.
+            Click a role badge to change it; changes take effect on the user's next login.
           </p>
         </div>
       </div>
@@ -520,6 +493,25 @@ const UserManagementPage: React.FC = () => {
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Password * (min. 6 characters)</label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={addForm.password}
+                    onChange={e => setAddForm(f => ({ ...f, password: e.target.value }))}
+                    placeholder="Set a login password"
+                    className="w-full px-3 py-2 pr-10 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showPassword ? <UserCheck className="h-4 w-4" /> : <UserCheck className="h-4 w-4 opacity-40" />}
+                  </button>
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
@@ -552,9 +544,6 @@ const UserManagementPage: React.FC = () => {
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
               </div>
-              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                After adding, also create a Firebase Auth account for this person in the Firebase Console so they can log in.
-              </p>
             </form>
 
             <div className="flex gap-3 px-6 py-4 border-t border-gray-200">
@@ -571,7 +560,7 @@ const UserManagementPage: React.FC = () => {
                 disabled={addingUser}
                 className="flex-1 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {addingUser ? 'Adding...' : 'Add User'}
+                {addingUser ? 'Creating...' : 'Create Account'}
               </button>
             </div>
           </div>

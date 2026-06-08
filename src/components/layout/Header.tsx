@@ -1,15 +1,92 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Search, Menu, ChevronDown, Settings, LogOut, User } from 'lucide-react';
+import { Bell, Search, Menu, ChevronDown, Settings, LogOut, User, MessageSquare, Info, AlertTriangle, Check } from 'lucide-react';
+import { collection, getDocs, query, orderBy, limit, updateDoc, doc, writeBatch } from 'firebase/firestore';
+import { db } from '@/firebase';
 import { useAuthStore } from '@/stores/authStore';
 import { useUIStore } from '@/stores/uiStore';
 import { clsx } from 'clsx';
+
+interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'info' | 'message' | 'alert';
+  read: boolean;
+  createdAt: Date;
+  link?: string;
+}
 
 const Header: React.FC = () => {
   const { user, logout } = useAuthStore();
   const { pageTitle, toggleMobileSidebar } = useUIStore();
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loadingNotif, setLoadingNotif] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  const fetchNotifications = async () => {
+    setLoadingNotif(true);
+    try {
+      const snap = await getDocs(
+        query(collection(db, 'notifications'), orderBy('createdAt', 'desc'), limit(20))
+      );
+      setNotifications(snap.docs.map(d => ({
+        id: d.id,
+        title: d.data().title || '',
+        message: d.data().message || '',
+        type: d.data().type || 'info',
+        read: d.data().read ?? false,
+        createdAt: d.data().createdAt?.toDate ? d.data().createdAt.toDate() : new Date(),
+        link: d.data().link,
+      })));
+    } catch { /* ignore */ } finally {
+      setLoadingNotif(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
+
+  const markAllRead = async () => {
+    const unread = notifications.filter(n => !n.read);
+    if (!unread.length) return;
+    try {
+      const batch = writeBatch(db);
+      unread.forEach(n => batch.update(doc(db, 'notifications', n.id), { read: true }));
+      await batch.commit();
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    } catch { /* ignore */ }
+  };
+
+  const handleBellClick = () => {
+    setShowNotifications(v => {
+      if (!v) fetchNotifications();
+      return !v;
+    });
+    setShowDropdown(false);
+  };
+
+  const typeIcon = (type: string) => {
+    if (type === 'message') return <MessageSquare className="h-4 w-4 text-blue-500" />;
+    if (type === 'alert') return <AlertTriangle className="h-4 w-4 text-amber-500" />;
+    return <Info className="h-4 w-4 text-gray-400" />;
+  };
+
+  const formatTime = (date: Date) => {
+    const diff = Date.now() - date.getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  };
 
   const handleLogout = () => {
     logout();
@@ -53,15 +130,91 @@ const Header: React.FC = () => {
           className="bg-transparent text-sm outline-none w-full text-gray-600 placeholder-gray-400"
         />
       </div>
-      <button className="relative p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors">
-        <Bell className="h-5 w-5" />
-        <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold">
-          3
-        </span>
-      </button>
+
+      {/* Notification Bell */}
+      <div className="relative" ref={notifRef}>
+        <button
+          onClick={handleBellClick}
+          className="relative p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+        >
+          <Bell className="h-5 w-5" />
+          {unreadCount > 0 && (
+            <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
+        </button>
+
+        {showNotifications && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setShowNotifications(false)} />
+            <div className="absolute right-0 top-full mt-1 w-80 bg-white rounded-xl shadow-lg border border-gray-200 z-20 overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
+                {unreadCount > 0 && (
+                  <button onClick={markAllRead} className="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1">
+                    <Check className="h-3 w-3" /> Mark all read
+                  </button>
+                )}
+              </div>
+
+              <div className="max-h-80 overflow-y-auto">
+                {loadingNotif ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="w-5 h-5 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />
+                  </div>
+                ) : notifications.length === 0 ? (
+                  <div className="py-10 text-center">
+                    <Bell className="h-8 w-8 text-gray-200 mx-auto mb-2" />
+                    <p className="text-sm text-gray-400">No notifications yet</p>
+                  </div>
+                ) : (
+                  notifications.map(n => (
+                    <div
+                      key={n.id}
+                      className={clsx(
+                        'flex items-start gap-3 px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer',
+                        !n.read && 'bg-blue-50/40'
+                      )}
+                      onClick={async () => {
+                        if (!n.read) {
+                          await updateDoc(doc(db, 'notifications', n.id), { read: true });
+                          setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x));
+                        }
+                        if (n.link) { navigate(n.link); setShowNotifications(false); }
+                      }}
+                    >
+                      <div className="mt-0.5 flex-shrink-0">{typeIcon(n.type)}</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900">{n.title}</p>
+                        <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.message}</p>
+                        <p className="text-xs text-gray-400 mt-1">{formatTime(n.createdAt)}</p>
+                      </div>
+                      {!n.read && <div className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0 mt-1.5" />}
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {notifications.length > 0 && (
+                <div className="px-4 py-2.5 border-t border-gray-100 text-center">
+                  <button
+                    onClick={() => { fetchNotifications(); }}
+                    className="text-xs text-primary-600 hover:text-primary-700"
+                  >
+                    Refresh
+                  </button>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* User Menu */}
       <div className="relative">
         <button
-          onClick={() => setShowDropdown(!showDropdown)}
+          onClick={() => { setShowDropdown(!showDropdown); setShowNotifications(false); }}
           className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
         >
           <div className="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center">

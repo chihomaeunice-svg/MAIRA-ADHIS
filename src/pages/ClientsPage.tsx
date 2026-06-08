@@ -34,7 +34,7 @@ const defaultForm = (): NewClientForm => ({
 
 const ClientsPage: React.FC = () => {
   const { setPageTitle } = useUIStore();
-  const { user, isLocalSession } = useAuthStore();
+  const { user } = useAuthStore();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -48,11 +48,6 @@ const ClientsPage: React.FC = () => {
 
   const fetchClients = async () => {
     setLoading(true);
-    if (isLocalSession) {
-      setClients([]);
-      setLoading(false);
-      return;
-    }
     try {
       const snap = await getDocs(query(collection(db, 'clients'), orderBy('createdAt', 'desc')));
       const data = snap.docs.map(d => ({

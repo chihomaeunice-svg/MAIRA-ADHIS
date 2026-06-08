@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
 import {
   LayoutDashboard, Briefcase, Users, FileText, Mail, ShoppingCart,
-  UserCog, Calendar, BarChart3, Settings, LogOut, Scale,
+  UserCog, Calendar, BarChart3, Settings, LogOut,
   ChevronLeft, ChevronRight, Globe, UserCog2,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
