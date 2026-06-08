@@ -8,7 +8,6 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { useStorage } from '@/hooks/useStorage';
-import { mockProcurement, mockExpenses, mockEmployees } from '@/data/mockData';
 import { Procurement, ProcurementStatus, Expense, ExpenseCategory } from '@/types';
 import { formatDate, formatCurrency, getStatusColor } from '@/lib/utils';
 import { useUIStore } from '@/stores/uiStore';
@@ -92,7 +91,7 @@ const ProcurementPage: React.FC = () => {
   });
 
   // Procurement
-  const [procurements, setProcurements] = useState<Procurement[]>(mockProcurement);
+  const [procurements, setProcurements] = useState<Procurement[]>([]);
   const [loadingProc, setLoadingProc] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<ProcurementStatus | 'ALL'>('ALL');
@@ -125,28 +124,10 @@ const ProcurementPage: React.FC = () => {
           };
         }));
       } else {
-        setExpenses(mockExpenses.map((e) => ({
-          id: e.id,
-          date: e.date instanceof Date ? e.date.toISOString().split('T')[0] : String(e.date),
-          category: e.category,
-          description: e.description,
-          amount: e.amount,
-          approvedBy: e.approvedBy || '',
-          receiptUrl: e.receiptUrl,
-          createdAt: e.date instanceof Date ? e.date : new Date(),
-        })));
+        setExpenses([]);
       }
     } catch {
-      setExpenses(mockExpenses.map((e) => ({
-        id: e.id,
-        date: e.date instanceof Date ? e.date.toISOString().split('T')[0] : String(e.date),
-        category: e.category,
-        description: e.description,
-        amount: e.amount,
-        approvedBy: e.approvedBy || '',
-        receiptUrl: e.receiptUrl,
-        createdAt: e.date instanceof Date ? e.date : new Date(),
-      })));
+      setExpenses([]);
     } finally {
       setLoadingExpenses(false);
     }
@@ -200,10 +181,10 @@ const ProcurementPage: React.FC = () => {
           };
         }));
       } else {
-        setProcurements(mockProcurement);
+        setProcurements([]);
       }
     } catch {
-      setProcurements(mockProcurement);
+      setProcurements([]);
     } finally {
       setLoadingProc(false);
     }
@@ -341,11 +322,6 @@ const ProcurementPage: React.FC = () => {
 
   // ─── Approve / Reject Procurement ─────────────────────────────────────────
   const handleApproveReject = async (id: string, newStatus: 'APPROVED' | 'REJECTED') => {
-    // mock data IDs start with 'proc-' — cannot be updated in Firestore
-    if (id.startsWith('proc-')) {
-      toast.error('Cannot update demo data. Submit a real procurement request first.');
-      return;
-    }
     try {
       await updateDoc(doc(db, 'procurement', id), {
         status: newStatus,
@@ -724,11 +700,9 @@ const ProcurementPage: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Approved By</label>
-                  <select value={expenseForm.approvedBy} onChange={(e) => setExpenseForm((p) => ({ ...p, approvedBy: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
-                    <option value="">— Select —</option>
-                    {mockEmployees.map((emp) => <option key={emp.id} value={emp.fullName}>{emp.fullName}</option>)}
-                  </select>
+                  <input type="text" value={expenseForm.approvedBy} onChange={(e) => setExpenseForm((p) => ({ ...p, approvedBy: e.target.value }))}
+                    placeholder="e.g. John Maira"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
                 </div>
               </div>
               <div>

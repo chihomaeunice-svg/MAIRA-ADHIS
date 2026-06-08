@@ -1,23 +1,94 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft, User, Building2, Phone, Mail, MapPin, Briefcase,
   Calendar, Hash, AlertCircle,
 } from 'lucide-react';
-import { mockClients, mockCases } from '@/data/mockData';
+import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '@/firebase';
 import { formatDate, getStatusColor } from '@/lib/utils';
 import { useUIStore } from '@/stores/uiStore';
 import { clsx } from 'clsx';
 
+interface ClientRecord {
+  id: string;
+  fullName: string;
+  clientType: 'INDIVIDUAL' | 'CORPORATE';
+  phone: string;
+  email: string;
+  address: string;
+  idNumber?: string;
+  companyName?: string;
+  companyReg?: string;
+  createdAt: string;
+}
+
+interface CaseItem {
+  id: string;
+  title: string;
+  caseNumber: string;
+  status: string;
+  filingDate: string;
+  advocateName: string;
+}
+
 const ClientDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { setPageTitle } = useUIStore();
-  const client = mockClients.find((c) => c.id === id);
-  const clientCases = mockCases.filter((c) => c.clientId === id);
+  const [client, setClient] = useState<ClientRecord | null>(null);
+  const [clientCases, setClientCases] = useState<CaseItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setPageTitle(client ? client.fullName : 'Client Not Found');
-  }, [client, setPageTitle]);
+    const load = async () => {
+      if (!id) { setLoading(false); return; }
+      try {
+        const docSnap = await getDoc(doc(db, 'clients', id));
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          const c: ClientRecord = {
+            id: docSnap.id,
+            fullName: data.fullName,
+            clientType: data.clientType,
+            phone: data.phone,
+            email: data.email,
+            address: data.address,
+            idNumber: data.idNumber,
+            companyName: data.companyName,
+            companyReg: data.companyReg,
+            createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : String(data.createdAt),
+          };
+          setClient(c);
+          setPageTitle(c.fullName);
+
+          const casesSnap = await getDocs(query(collection(db, 'cases'), where('clientId', '==', id)));
+          setClientCases(casesSnap.docs.map((d) => {
+            const cd = d.data();
+            return {
+              id: d.id,
+              title: cd.title,
+              caseNumber: cd.caseNumber,
+              status: cd.status,
+              filingDate: cd.filingDate?.toDate ? cd.filingDate.toDate().toISOString() : String(cd.filingDate),
+              advocateName: cd.advocateName || '',
+            };
+          }));
+        } else {
+          setPageTitle('Client Not Found');
+        }
+      } catch {
+        setPageTitle('Client Not Found');
+      }
+      setLoading(false);
+    };
+    load();
+  }, [id, setPageTitle]);
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-24">
+      <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
 
   if (!client) {
     return (
@@ -71,7 +142,6 @@ const ClientDetailPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Contact Details */}
         <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3 pt-5 border-t border-gray-100">
           <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
             <Phone className="h-4 w-4 text-gray-400 flex-shrink-0" />
@@ -122,10 +192,6 @@ const ClientDetailPage: React.FC = () => {
             <Briefcase className="h-4 w-4 text-primary-600" />
             Cases ({clientCases.length})
           </h2>
-          <button className="text-xs text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1">
-            <Briefcase className="h-3.5 w-3.5" />
-            New Case
-          </button>
         </div>
         {clientCases.length === 0 ? (
           <div className="py-8 text-center">
