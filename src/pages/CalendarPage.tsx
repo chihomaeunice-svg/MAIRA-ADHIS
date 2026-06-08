@@ -126,9 +126,11 @@ const CalendarPage: React.FC = () => {
       })
     : [];
 
+  const todayDateStr = new Date().toISOString().split('T')[0];
+
   const upcomingEvents = [...events]
     .filter((e) => {
-      const isUpcoming = new Date(e.date) >= new Date();
+      const isUpcoming = e.date >= todayDateStr;
       const matchType  = typeFilter === 'ALL' || e.type === typeFilter;
       return isUpcoming && matchType;
     })
@@ -335,11 +337,11 @@ const CalendarPage: React.FC = () => {
                     typeFilter === 'ALL' ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50'
                   )}
                 >
-                  All Events ({events.filter((e) => new Date(e.date) >= new Date()).length})
+                  All Events ({events.filter((e) => e.date >= todayDateStr).length})
                 </button>
                 {(Object.entries(TYPE_CONFIG) as [CalendarEventType, typeof TYPE_CONFIG[CalendarEventType]][]).map(([type, cfg]) => {
                   const EventIcon = cfg.icon;
-                  const count = events.filter((e) => e.type === type && new Date(e.date) >= new Date()).length;
+                  const count = events.filter((e) => e.type === type && e.date >= todayDateStr).length;
                   return (
                     <button
                       key={type}
