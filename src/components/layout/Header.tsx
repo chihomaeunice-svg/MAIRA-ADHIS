@@ -18,7 +18,7 @@ interface Notification {
 }
 
 const Header: React.FC = () => {
-  const { user, logout, isLocalSession } = useAuthStore();
+  const { user, logout } = useAuthStore();
   const { pageTitle, toggleMobileSidebar } = useUIStore();
   const [showDropdown, setShowDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -30,7 +30,6 @@ const Header: React.FC = () => {
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const fetchNotifications = async () => {
-    if (isLocalSession) return;
     setLoadingNotif(true);
     try {
       const snap = await getDocs(
@@ -52,7 +51,7 @@ const Header: React.FC = () => {
 
   useEffect(() => {
     fetchNotifications();
-  }, [isLocalSession]);
+  }, []);
 
   const markAllRead = async () => {
     const unread = notifications.filter(n => !n.read);
