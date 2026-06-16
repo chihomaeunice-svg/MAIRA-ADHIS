@@ -7,11 +7,13 @@ import {
 } from 'lucide-react';
 
 const practiceAreas = [
-  { icon: Briefcase, title: 'Commercial & Corporate Law', desc: 'Expert handling of business disputes, contract enforcement, and corporate governance matters.', color: 'bg-blue-50 text-blue-600' },
-  { icon: Heart, title: 'Family Matters', desc: 'Compassionate representation in divorce, custody, inheritance, and family dispute resolutions.', color: 'bg-pink-50 text-pink-600' },
-  { icon: Building, title: 'Conveyances & Property', desc: 'Comprehensive property law services including title transfers, land disputes, and conveyancing.', color: 'bg-green-50 text-green-600' },
-  { icon: Users, title: 'Labour Law', desc: 'Protecting employee and employer rights in employment disputes, unfair dismissal, and workplace matters.', color: 'bg-purple-50 text-purple-600' },
-  { icon: FileText, title: 'Notary Public', desc: 'Official notarization, certification of documents, and commissioner for oaths services.', color: 'bg-yellow-50 text-yellow-600' },
+  { icon: Briefcase, title: 'Commercial & Corporate Law', desc: 'Expert handling of business disputes, contract enforcement, debt recovery, company formation, corporate restructuring, and governance matters for businesses of all sizes.', color: 'bg-blue-50 text-blue-600' },
+  { icon: Scale, title: 'Civil Litigation', desc: 'Skilled representation in civil suits including breach of contract, tort claims, debt recovery, injunctions, and general civil disputes before all levels of court.', color: 'bg-indigo-50 text-indigo-600' },
+  { icon: Heart, title: 'Family Matters', desc: 'Compassionate representation in divorce, custody, maintenance, inheritance, matrimonial property, and all family dispute resolutions with sensitivity and discretion.', color: 'bg-pink-50 text-pink-600' },
+  { icon: Building, title: 'Conveyances & Land', desc: 'Comprehensive property and land law services including title transfers, sale agreements, land disputes, surveying matters, land tribunal proceedings, and conveyancing.', color: 'bg-green-50 text-green-600' },
+  { icon: Users, title: 'Labour & Employment', desc: 'Protecting employee and employer rights in employment disputes, unfair dismissal, wrongful termination, CMA proceedings, and all labour court matters.', color: 'bg-purple-50 text-purple-600' },
+  { icon: Shield, title: 'Criminal Defense', desc: 'Vigorous defense representation for individuals facing criminal charges, bail applications, appeals, and all matters before the criminal division of the courts.', color: 'bg-red-50 text-red-600' },
+  { icon: FileText, title: 'Notary Public & Oaths', desc: 'Official notarization, certification of documents, affidavits, statutory declarations, and commissioner for oaths services for local and international use.', color: 'bg-yellow-50 text-yellow-600' },
 ];
 
 const testimonials = [
@@ -24,7 +26,7 @@ const features = [
   { icon: Award, title: 'Expert Legal Team', desc: 'Our advocates are highly qualified with years of courtroom experience across multiple practice areas.' },
   { icon: Lock, title: 'Strict Confidentiality', desc: 'Your case information is handled with the highest level of professional secrecy and discretion.' },
   { icon: Clock, title: 'Timely Service', desc: 'We respect your time and deadlines, ensuring prompt responses and efficient case management.' },
-  { icon: CheckCircle, title: 'Proven Track Record', desc: 'Over 500 cases successfully resolved, building a reputation for excellence in Tanzanian courts.' },
+  { icon: CheckCircle, title: 'Proven Track Record', desc: 'Over 300 cases successfully resolved, building a reputation for excellence in Tanzanian courts.' },
 ];
 
 const LandingPage: React.FC = () => {
@@ -132,7 +134,7 @@ const LandingPage: React.FC = () => {
                 <p className="text-white/80 text-xs">Years</p>
               </div>
               <div className="absolute -bottom-4 -left-4 bg-white rounded-2xl p-4 shadow-xl">
-                <p className="text-primary-600 text-2xl font-bold">500+</p>
+                <p className="text-primary-600 text-2xl font-bold">300+</p>
                 <p className="text-gray-500 text-xs">Cases Won</p>
               </div>
             </div>

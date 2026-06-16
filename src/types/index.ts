@@ -14,7 +14,7 @@ export interface FirestoreUser {
   lastLogin?: Date;
 }
 
-export type CaseStatus = 'NEW' | 'ONGOING' | 'COMPLETED' | 'ARCHIVED';
+export type CaseStatus = 'NEW' | 'ONGOING' | 'COMPLETED' | 'ARCHIVED' | 'DRAFT';
 
 export interface User {
   id: string;

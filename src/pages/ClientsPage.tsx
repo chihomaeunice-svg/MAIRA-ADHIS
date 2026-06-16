@@ -93,7 +93,6 @@ const ClientsPage: React.FC = () => {
     e.preventDefault();
     if (!form.fullName.trim()) { toast.error('Full name is required'); return; }
     if (!form.phone.trim()) { toast.error('Phone number is required'); return; }
-    if (!form.email.trim()) { toast.error('Email is required'); return; }
     if (form.clientType === 'CORPORATE' && !form.companyName.trim()) {
       toast.error('Company name is required for corporate clients');
       return;
@@ -362,12 +361,12 @@ const ClientsPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                   <input
                     type="email"
                     value={form.email}
                     onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                    placeholder="client@example.com"
+                    placeholder="client@example.com (optional)"
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
