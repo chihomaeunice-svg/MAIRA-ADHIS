@@ -11,6 +11,7 @@ const statusConfig = {
   ONGOING: { variant: 'warning' as const, label: 'Ongoing' },
   COMPLETED: { variant: 'success' as const, label: 'Completed' },
   ARCHIVED: { variant: 'gray' as const, label: 'Archived' },
+  DRAFT: { variant: 'gray' as const, label: 'Draft' },
 };
 
 interface CaseCardProps {

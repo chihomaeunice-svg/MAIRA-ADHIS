@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Filter, Briefcase, Eye, Calendar, User, X, Trash2 } from 'lucide-react';
+import { Plus, Search, Filter, Briefcase, Eye, Calendar, User, X, Trash2, FileEdit } from 'lucide-react';
 import {
   collection, addDoc, getDocs, query, orderBy, Timestamp, deleteDoc, doc,
 } from 'firebase/firestore';
@@ -14,6 +14,7 @@ import toast from 'react-hot-toast';
 
 const STATUSES: { value: CaseStatus | 'ALL'; label: string }[] = [
   { value: 'ALL', label: 'All Cases' },
+  { value: 'DRAFT', label: 'Draft' },
   { value: 'NEW', label: 'New' },
   { value: 'ONGOING', label: 'Ongoing' },
   { value: 'COMPLETED', label: 'Completed' },
@@ -22,6 +23,7 @@ const STATUSES: { value: CaseStatus | 'ALL'; label: string }[] = [
 
 const CATEGORIES = [
   'All Categories',
+  'Civil Litigation',
   'Commercial & Corporate',
   'Criminal Defense',
   'Labour Law',
@@ -38,10 +40,12 @@ const COURT_NAMES = [
   'Labour Court of Tanzania',
   'Court of Appeal',
   'District Court',
+  'Land Division - High Court',
   'Other',
 ];
 
 const CASE_CATEGORIES = [
+  'Civil Litigation',
   'Commercial & Corporate',
   'Criminal Defense',
   'Labour Law',
@@ -61,12 +65,15 @@ interface NewCaseForm {
   caseNumber: string;
   title: string;
   courtName: string;
-  plaintiff: string;
-  defendant: string;
+  plaintiffs: string[];
+  defendants: string[];
   opposingCounsel: string;
+  opposingCounselPhone: string;
+  opposingCounselEmail: string;
+  opposingCounselAddress: string;
   judgeName: string;
-  advocateId: string;
-  advocateName: string;
+  selectedAdvocateIds: string[];
+  selectedAdvocateNames: string[];
   filingDate: string;
   firstHearingDate: string;
   category: string;
@@ -78,15 +85,18 @@ const defaultForm = (): NewCaseForm => ({
   caseNumber: generateCaseNumber(),
   title: '',
   courtName: 'High Court of Tanzania',
-  plaintiff: '',
-  defendant: '',
+  plaintiffs: [''],
+  defendants: [''],
   opposingCounsel: '',
+  opposingCounselPhone: '',
+  opposingCounselEmail: '',
+  opposingCounselAddress: '',
   judgeName: '',
-  advocateId: '',
-  advocateName: '',
+  selectedAdvocateIds: [''],
+  selectedAdvocateNames: [''],
   filingDate: new Date().toISOString().split('T')[0],
   firstHearingDate: '',
-  category: 'Commercial & Corporate',
+  category: 'Civil Litigation',
   description: '',
   status: 'NEW',
 });
@@ -177,6 +187,7 @@ const CasesPage: React.FC = () => {
 
   const counts = {
     ALL: cases.length,
+    DRAFT: cases.filter((c) => c.status === 'DRAFT').length,
     NEW: cases.filter((c) => c.status === 'NEW').length,
     ONGOING: cases.filter((c) => c.status === 'ONGOING').length,
     COMPLETED: cases.filter((c) => c.status === 'COMPLETED').length,
@@ -195,47 +206,65 @@ const CasesPage: React.FC = () => {
     }
   };
 
-  const handleAdvocateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const adv = advocates.find(a => a.id === e.target.value);
-    setForm(p => ({ ...p, advocateId: adv?.id || '', advocateName: adv?.name || '' }));
+  const updateAdvocate = (index: number, id: string) => {
+    const adv = advocates.find(a => a.id === id);
+    setForm(p => {
+      const ids = [...p.selectedAdvocateIds];
+      const names = [...p.selectedAdvocateNames];
+      ids[index] = id;
+      names[index] = adv?.name || '';
+      return { ...p, selectedAdvocateIds: ids, selectedAdvocateNames: names };
+    });
+  };
+
+  const buildCasePayload = (status: CaseStatus) => {
+    const now = Timestamp.now();
+    const joinedPlaintiff = form.plaintiffs.filter(s => s.trim()).join(' & ');
+    const joinedDefendant = form.defendants.filter(s => s.trim()).join(' & ');
+    const joinedAdvocateName = form.selectedAdvocateNames.filter(Boolean).join(' & ');
+    const primaryAdvocateId = form.selectedAdvocateIds.filter(Boolean)[0] || '';
+    const hearingDates = form.firstHearingDate
+      ? [{ id: `h-${Date.now()}`, date: Timestamp.fromDate(new Date(form.firstHearingDate)), venue: form.courtName, purpose: 'First Hearing' }]
+      : [];
+
+    return {
+      caseNumber: form.caseNumber,
+      title: form.title.trim(),
+      courtName: form.courtName,
+      partiesNames: { plaintiff: joinedPlaintiff, defendant: joinedDefendant },
+      opposingCounsel: form.opposingCounsel.trim() || null,
+      opposingCounselPhone: form.opposingCounselPhone.trim() || null,
+      opposingCounselEmail: form.opposingCounselEmail.trim() || null,
+      opposingCounselAddress: form.opposingCounselAddress.trim() || null,
+      judgeName: form.judgeName.trim() || null,
+      advocateId: primaryAdvocateId,
+      advocateName: joinedAdvocateName,
+      advocateIds: form.selectedAdvocateIds.filter(Boolean),
+      advocateNames: form.selectedAdvocateNames.filter(Boolean),
+      clientId: '',
+      clientName: joinedPlaintiff,
+      filingDate: Timestamp.fromDate(new Date(form.filingDate)),
+      hearingDates,
+      status,
+      category: form.category,
+      description: form.description.trim(),
+      notes: [],
+      documents: [],
+      addedBy: user?.id || 'unknown',
+      addedByName: user?.name || 'Unknown',
+      createdAt: now,
+      updatedAt: now,
+    };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title.trim()) { toast.error('Case title is required'); return; }
-    if (!form.plaintiff.trim()) { toast.error('Plaintiff name is required'); return; }
-    if (!form.defendant.trim()) { toast.error('Defendant name is required'); return; }
+    if (!form.plaintiffs.some(s => s.trim())) { toast.error('At least one plaintiff is required'); return; }
+    if (!form.defendants.some(s => s.trim())) { toast.error('At least one defendant is required'); return; }
     setSaving(true);
     try {
-      const now = Timestamp.now();
-      const hearingDates = form.firstHearingDate
-        ? [{ id: `h-${Date.now()}`, date: Timestamp.fromDate(new Date(form.firstHearingDate)), venue: form.courtName, purpose: 'First Hearing' }]
-        : [];
-
-      await addDoc(collection(db, 'cases'), {
-        caseNumber: form.caseNumber,
-        title: form.title.trim(),
-        courtName: form.courtName,
-        partiesNames: { plaintiff: form.plaintiff.trim(), defendant: form.defendant.trim() },
-        opposingCounsel: form.opposingCounsel.trim() || null,
-        judgeName: form.judgeName.trim() || null,
-        advocateId: form.advocateId,
-        advocateName: form.advocateName,
-        clientId: '',
-        clientName: form.plaintiff.trim(),
-        filingDate: Timestamp.fromDate(new Date(form.filingDate)),
-        hearingDates,
-        status: form.status,
-        category: form.category,
-        description: form.description.trim(),
-        notes: [],
-        documents: [],
-        addedBy: user?.id || 'unknown',
-        addedByName: user?.name || 'Unknown',
-        createdAt: now,
-        updatedAt: now,
-      });
-
+      await addDoc(collection(db, 'cases'), buildCasePayload(form.status));
       toast.success('Case added successfully');
       setShowNewCase(false);
       setForm(defaultForm());
@@ -247,6 +276,37 @@ const CasesPage: React.FC = () => {
       setSaving(false);
     }
   };
+
+  const handleSaveDraft = async () => {
+    if (!form.title.trim()) { toast.error('A case title is required to save as draft'); return; }
+    setSaving(true);
+    try {
+      await addDoc(collection(db, 'cases'), buildCasePayload('DRAFT'));
+      toast.success('Case saved as draft');
+      setShowNewCase(false);
+      setForm(defaultForm());
+      fetchCases();
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to save draft');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateParty = (type: 'plaintiffs' | 'defendants', index: number, value: string) => {
+    setForm(p => {
+      const arr = [...p[type]];
+      arr[index] = value;
+      return { ...p, [type]: arr };
+    });
+  };
+
+  const addParty = (type: 'plaintiffs' | 'defendants') =>
+    setForm(p => ({ ...p, [type]: [...p[type], ''] }));
+
+  const removeParty = (type: 'plaintiffs' | 'defendants', index: number) =>
+    setForm(p => ({ ...p, [type]: p[type].filter((_, i) => i !== index) }));
 
   return (
     <div className="space-y-5">
@@ -354,7 +414,7 @@ const CasesPage: React.FC = () => {
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
                   <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Case</th>
-                  <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3 hidden md:table-cell">Client</th>
+                  <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3 hidden md:table-cell">Client / Plaintiff</th>
                   <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3 hidden lg:table-cell">Advocate</th>
                   <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3 hidden lg:table-cell">Category</th>
                   <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Status</th>
@@ -432,14 +492,16 @@ const CasesPage: React.FC = () => {
       {/* New Case Modal */}
       {showNewCase && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between p-5 border-b border-gray-200 sticky top-0 bg-white z-10">
               <h2 className="text-lg font-semibold text-gray-900">New Case</h2>
               <button onClick={() => setShowNewCase(false)} className="p-1 hover:bg-gray-100 rounded-lg">
                 <X className="h-5 w-5 text-gray-500" />
               </button>
             </div>
-            <form onSubmit={handleSubmit} className="p-5 space-y-4">
+
+            <form onSubmit={handleSubmit} className="p-5 space-y-5">
+              {/* Case Number & Filing Date */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Case Number *</label>
@@ -463,6 +525,7 @@ const CasesPage: React.FC = () => {
                 </div>
               </div>
 
+              {/* Case Title */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Case Title *</label>
                 <input
@@ -470,94 +533,23 @@ const CasesPage: React.FC = () => {
                   required
                   value={form.title}
                   onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
-                  placeholder="e.g. Kimaro v. Mkando Real Estate Ltd"
+                  placeholder="e.g. Kimaro & Saidi v. Mkando Real Estate Ltd"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Court Name *</label>
-                <select
-                  value={form.courtName}
-                  onChange={(e) => setForm((p) => ({ ...p, courtName: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
-                >
-                  {COURT_NAMES.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-
+              {/* Court & Category */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Plaintiff Name *</label>
-                  <input
-                    type="text"
-                    required
-                    value={form.plaintiff}
-                    onChange={(e) => setForm((p) => ({ ...p, plaintiff: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Defendant Name *</label>
-                  <input
-                    type="text"
-                    required
-                    value={form.defendant}
-                    onChange={(e) => setForm((p) => ({ ...p, defendant: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Opposing Counsel</label>
-                  <input
-                    type="text"
-                    value={form.opposingCounsel}
-                    onChange={(e) => setForm((p) => ({ ...p, opposingCounsel: e.target.value }))}
-                    placeholder="Name of opposing advocate / firm"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Presiding Judge / Magistrate</label>
-                  <input
-                    type="text"
-                    value={form.judgeName}
-                    onChange={(e) => setForm((p) => ({ ...p, judgeName: e.target.value }))}
-                    placeholder="e.g. Hon. Justice Mwangi"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Advocate Handling</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Court Name *</label>
                   <select
-                    value={form.advocateId}
-                    onChange={handleAdvocateChange}
+                    value={form.courtName}
+                    onChange={(e) => setForm((p) => ({ ...p, courtName: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                   >
-                    <option value="">— Select Advocate —</option>
-                    {advocates.map(adv => (
-                      <option key={adv.id} value={adv.id}>{adv.name}</option>
-                    ))}
+                    {COURT_NAMES.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">First Hearing Date (optional)</label>
-                  <input
-                    type="date"
-                    value={form.firstHearingDate}
-                    onChange={(e) => setForm((p) => ({ ...p, firstHearingDate: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Case Category *</label>
                   <select
@@ -567,6 +559,187 @@ const CasesPage: React.FC = () => {
                   >
                     {CASE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
+                </div>
+              </div>
+
+              {/* Plaintiffs */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-sm font-medium text-gray-700">Plaintiff(s) *</label>
+                  <button
+                    type="button"
+                    onClick={() => addParty('plaintiffs')}
+                    className="text-xs text-primary-600 hover:text-primary-700 font-medium flex items-center gap-0.5"
+                  >
+                    <Plus className="h-3 w-3" /> Add plaintiff
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {form.plaintiffs.map((pl, i) => (
+                    <div key={i} className="flex gap-2">
+                      <input
+                        type="text"
+                        value={pl}
+                        onChange={(e) => updateParty('plaintiffs', i, e.target.value)}
+                        placeholder={`Plaintiff ${i + 1}`}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                      {form.plaintiffs.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeParty('plaintiffs', i)}
+                          className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Defendants */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-sm font-medium text-gray-700">Defendant(s) *</label>
+                  <button
+                    type="button"
+                    onClick={() => addParty('defendants')}
+                    className="text-xs text-primary-600 hover:text-primary-700 font-medium flex items-center gap-0.5"
+                  >
+                    <Plus className="h-3 w-3" /> Add defendant
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {form.defendants.map((def, i) => (
+                    <div key={i} className="flex gap-2">
+                      <input
+                        type="text"
+                        value={def}
+                        onChange={(e) => updateParty('defendants', i, e.target.value)}
+                        placeholder={`Defendant ${i + 1}`}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                      {form.defendants.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeParty('defendants', i)}
+                          className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Opposing Counsel */}
+              <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                <label className="block text-sm font-semibold text-gray-700">Opposing Counsel (optional)</label>
+                <input
+                  type="text"
+                  value={form.opposingCounsel}
+                  onChange={(e) => setForm((p) => ({ ...p, opposingCounsel: e.target.value }))}
+                  placeholder="Name of opposing advocate or law firm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <input
+                    type="tel"
+                    value={form.opposingCounselPhone}
+                    onChange={(e) => setForm((p) => ({ ...p, opposingCounselPhone: e.target.value }))}
+                    placeholder="Phone number"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                  />
+                  <input
+                    type="email"
+                    value={form.opposingCounselEmail}
+                    onChange={(e) => setForm((p) => ({ ...p, opposingCounselEmail: e.target.value }))}
+                    placeholder="Email address"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                  />
+                </div>
+                <input
+                  type="text"
+                  value={form.opposingCounselAddress}
+                  onChange={(e) => setForm((p) => ({ ...p, opposingCounselAddress: e.target.value }))}
+                  placeholder="Physical / postal address"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                />
+              </div>
+
+              {/* Judge */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Presiding Judge / Magistrate</label>
+                <input
+                  type="text"
+                  value={form.judgeName}
+                  onChange={(e) => setForm((p) => ({ ...p, judgeName: e.target.value }))}
+                  placeholder="e.g. Hon. Justice Mwangi"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+
+              {/* Advocates */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-sm font-medium text-gray-700">Advocate(s) Handling</label>
+                  {form.selectedAdvocateIds.length < 2 && (
+                    <button
+                      type="button"
+                      onClick={() => setForm(p => ({
+                        ...p,
+                        selectedAdvocateIds: [...p.selectedAdvocateIds, ''],
+                        selectedAdvocateNames: [...p.selectedAdvocateNames, ''],
+                      }))}
+                      className="text-xs text-primary-600 hover:text-primary-700 font-medium flex items-center gap-0.5"
+                    >
+                      <Plus className="h-3 w-3" /> Add 2nd advocate
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  {form.selectedAdvocateIds.map((id, i) => (
+                    <div key={i} className="flex gap-2">
+                      <select
+                        value={id}
+                        onChange={(e) => updateAdvocate(i, e.target.value)}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                      >
+                        <option value="">— Select advocate —</option>
+                        {advocates.map(adv => (
+                          <option key={adv.id} value={adv.id}>{adv.name}</option>
+                        ))}
+                      </select>
+                      {form.selectedAdvocateIds.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => setForm(p => ({
+                            ...p,
+                            selectedAdvocateIds: p.selectedAdvocateIds.filter((_, j) => j !== i),
+                            selectedAdvocateNames: p.selectedAdvocateNames.filter((_, j) => j !== i),
+                          }))}
+                          className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* First Hearing & Status */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">First Hearing Date (optional)</label>
+                  <input
+                    type="date"
+                    value={form.firstHearingDate}
+                    onChange={(e) => setForm((p) => ({ ...p, firstHearingDate: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
@@ -583,6 +756,7 @@ const CasesPage: React.FC = () => {
                 </div>
               </div>
 
+              {/* Description */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                 <textarea
@@ -594,13 +768,22 @@ const CasesPage: React.FC = () => {
                 />
               </div>
 
-              <div className="flex gap-3 pt-2">
+              {/* Buttons */}
+              <div className="flex gap-3 pt-1">
                 <button
                   type="button"
                   onClick={() => setShowNewCase(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50"
+                  className="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50"
                 >
                   Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={handleSaveDraft}
+                  className="flex items-center gap-2 px-4 py-2 border border-primary-300 text-primary-700 bg-primary-50 text-sm font-medium rounded-lg hover:bg-primary-100 disabled:opacity-50"
+                >
+                  <FileEdit className="h-4 w-4" /> Save as Draft
                 </button>
                 <button
                   type="submit"
