@@ -79,7 +79,12 @@ function DetailModal({ area, onClose }: { area: PracticeArea; onClose: () => voi
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
+    // Prevent body scroll while modal is open
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handler);
+      document.body.style.overflow = "";
+    };
   }, [onClose]);
 
   return (
@@ -88,69 +93,69 @@ function DetailModal({ area, onClose }: { area: PracticeArea; onClose: () => voi
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[100] overflow-y-auto"
       onClick={onClose}
     >
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-md" />
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-md" />
 
-      {/* Modal */}
-      <motion.div
-        initial={{ scale: 0.88, opacity: 0, y: 30 }}
-        animate={{ scale: 1, opacity: 1, y: 0 }}
-        exit={{ scale: 0.92, opacity: 0, y: 20 }}
-        transition={{ type: "spring", stiffness: 300, damping: 28 }}
-        onClick={(e) => e.stopPropagation()}
-        className="relative z-10 w-full max-w-2xl bg-white rounded-[2rem] overflow-hidden shadow-2xl"
+      {/* Always-visible close button fixed to viewport */}
+      <button
+        onClick={onClose}
+        className="fixed top-4 right-4 z-[110] w-11 h-11 bg-black/60 hover:bg-black/80 backdrop-blur rounded-full flex items-center justify-center transition-colors shadow-lg"
       >
-        {/* Image header */}
-        <div className="relative h-56 md:h-72">
-          <img src={area.image} alt={area.label} className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+        <X className="h-5 w-5 text-white" />
+      </button>
 
-          {/* Close button */}
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 w-10 h-10 bg-black/40 hover:bg-black/60 backdrop-blur rounded-full flex items-center justify-center transition-colors"
-          >
-            <X className="h-5 w-5 text-white" />
-          </button>
-
-          {/* Title overlay */}
-          <div className="absolute bottom-5 left-6 right-6">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 bg-white/20 backdrop-blur rounded-lg flex items-center justify-center">
-                <Icon className="h-4 w-4 text-white" />
+      {/* Scroll container — centres modal, allows scrolling if taller than screen */}
+      <div className="relative min-h-full flex items-center justify-center p-4 py-16">
+        <motion.div
+          initial={{ scale: 0.88, opacity: 0, y: 30 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          exit={{ scale: 0.92, opacity: 0, y: 20 }}
+          transition={{ type: "spring", stiffness: 300, damping: 28 }}
+          onClick={(e) => e.stopPropagation()}
+          className="relative z-10 w-full max-w-xl bg-white rounded-[1.5rem] overflow-hidden shadow-2xl"
+        >
+          {/* Image header — fixed short height so it never dominates */}
+          <div className="relative h-44 sm:h-52">
+            <img src={area.image} alt={area.label} className="w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+            <div className="absolute bottom-4 left-5 right-5">
+              <div className="flex items-center gap-2 mb-1.5">
+                <div className="w-7 h-7 bg-white/20 backdrop-blur rounded-lg flex items-center justify-center">
+                  <Icon className="h-3.5 w-3.5 text-white" />
+                </div>
+                <span className="text-white/70 text-[10px] font-semibold uppercase tracking-widest">Practice Area</span>
               </div>
-              <span className="text-white/80 text-xs font-semibold uppercase tracking-widest">Practice Area</span>
+              <h2 className="text-white text-xl sm:text-2xl font-bold leading-tight">{area.label}</h2>
             </div>
-            <h2 className="text-white text-2xl md:text-3xl font-bold leading-tight">{area.label}</h2>
-          </div>
-        </div>
-
-        {/* Body */}
-        <div className="p-6 md:p-8">
-          <p className="text-gray-600 leading-relaxed mb-6">{area.description}</p>
-
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Services We Provide</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-7">
-            {area.services.map((svc) => (
-              <div key={svc} className="flex items-start gap-2.5 p-2.5 rounded-xl bg-gray-50 border border-gray-100">
-                <span className="mt-1 w-1.5 h-1.5 bg-primary-600 rounded-full flex-shrink-0" />
-                <span className="text-gray-700 text-sm leading-snug">{svc}</span>
-              </div>
-            ))}
           </div>
 
-          <a
-            href="#contact"
-            onClick={onClose}
-            className="flex items-center justify-center gap-2 w-full bg-primary-600 hover:bg-primary-700 text-white py-3.5 rounded-xl font-semibold transition-colors text-sm"
-          >
-            Book a Consultation <ArrowRight className="h-4 w-4" />
-          </a>
-        </div>
-      </motion.div>
+          {/* Body */}
+          <div className="p-5 sm:p-7">
+            <p className="text-gray-600 text-sm leading-relaxed mb-5">{area.description}</p>
+
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Services We Provide</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-6">
+              {area.services.map((svc) => (
+                <div key={svc} className="flex items-start gap-2.5 p-2.5 rounded-xl bg-gray-50 border border-gray-100">
+                  <span className="mt-1 w-1.5 h-1.5 bg-primary-600 rounded-full flex-shrink-0" />
+                  <span className="text-gray-700 text-sm leading-snug">{svc}</span>
+                </div>
+              ))}
+            </div>
+
+            <a
+              href="#contact"
+              onClick={onClose}
+              className="flex items-center justify-center gap-2 w-full bg-primary-600 hover:bg-primary-700 text-white py-3.5 rounded-xl font-semibold transition-colors text-sm"
+            >
+              Book a Consultation <ArrowRight className="h-4 w-4" />
+            </a>
+          </div>
+        </motion.div>
+      </div>
     </motion.div>
   );
 }
