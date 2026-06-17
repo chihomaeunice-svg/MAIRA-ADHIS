@@ -7,13 +7,48 @@ import {
 } from 'lucide-react';
 
 const practiceAreas = [
-  { icon: Briefcase, title: 'Commercial & Corporate Law', desc: 'Expert handling of business disputes, contract enforcement, debt recovery, company formation, corporate restructuring, and governance matters for businesses of all sizes.', color: 'bg-blue-50 text-blue-600' },
-  { icon: Scale, title: 'Civil Litigation', desc: 'Skilled representation in civil suits including breach of contract, tort claims, debt recovery, injunctions, and general civil disputes before all levels of court.', color: 'bg-indigo-50 text-indigo-600' },
-  { icon: Heart, title: 'Family Matters', desc: 'Compassionate representation in divorce, custody, maintenance, inheritance, matrimonial property, and all family dispute resolutions with sensitivity and discretion.', color: 'bg-pink-50 text-pink-600' },
-  { icon: Building, title: 'Conveyances & Land', desc: 'Comprehensive property and land law services including title transfers, sale agreements, land disputes, surveying matters, land tribunal proceedings, and conveyancing.', color: 'bg-green-50 text-green-600' },
-  { icon: Users, title: 'Labour & Employment', desc: 'Protecting employee and employer rights in employment disputes, unfair dismissal, wrongful termination, CMA proceedings, and all labour court matters.', color: 'bg-purple-50 text-purple-600' },
-  { icon: Shield, title: 'Criminal Defense', desc: 'Vigorous defense representation for individuals facing criminal charges, bail applications, appeals, and all matters before the criminal division of the courts.', color: 'bg-red-50 text-red-600' },
-  { icon: FileText, title: 'Notary Public & Oaths', desc: 'Official notarization, certification of documents, affidavits, statutory declarations, and commissioner for oaths services for local and international use.', color: 'bg-yellow-50 text-yellow-600' },
+  {
+    icon: Briefcase, title: 'Commercial & Corporate Law',
+    desc: 'Expert handling of business disputes, contract enforcement, debt recovery, company formation, corporate restructuring, and governance matters for businesses of all sizes.',
+    color: 'bg-blue-50 text-blue-600', panelColor: 'from-blue-600 to-blue-800',
+    services: ['Business dispute resolution', 'Contract drafting & enforcement', 'Debt recovery proceedings', 'Company formation & registration', 'Corporate restructuring', 'Mergers & acquisitions', 'Shareholder agreements'],
+  },
+  {
+    icon: Scale, title: 'Civil Litigation',
+    desc: 'Skilled representation in civil suits including breach of contract, tort claims, debt recovery, injunctions, and general civil disputes before all levels of court.',
+    color: 'bg-indigo-50 text-indigo-600', panelColor: 'from-indigo-600 to-indigo-800',
+    services: ['Breach of contract claims', 'Tort & negligence claims', 'Injunctions & restraining orders', 'Debt recovery suits', 'Appeals & judicial review', 'Mediation & arbitration'],
+  },
+  {
+    icon: Heart, title: 'Family Matters',
+    desc: 'Compassionate representation in divorce, custody, maintenance, inheritance, matrimonial property, and all family dispute resolutions with sensitivity and discretion.',
+    color: 'bg-pink-50 text-pink-600', panelColor: 'from-pink-600 to-rose-700',
+    services: ['Divorce & separation', 'Child custody & guardianship', 'Maintenance & alimony', 'Estate & inheritance disputes', 'Matrimonial property division', 'Adoption proceedings'],
+  },
+  {
+    icon: Building, title: 'Conveyances & Land',
+    desc: 'Comprehensive property and land law services including title transfers, sale agreements, land disputes, surveying matters, land tribunal proceedings, and conveyancing.',
+    color: 'bg-green-50 text-green-600', panelColor: 'from-green-600 to-emerald-800',
+    services: ['Title deed transfers', 'Sale & purchase agreements', 'Land tribunal proceedings', 'Lease agreements', 'Mortgage & charges', 'Land dispute resolution', 'Surveying & boundary matters'],
+  },
+  {
+    icon: Users, title: 'Labour & Employment',
+    desc: 'Protecting employee and employer rights in employment disputes, unfair dismissal, wrongful termination, CMA proceedings, and all labour court matters.',
+    color: 'bg-purple-50 text-purple-600', panelColor: 'from-purple-600 to-violet-800',
+    services: ['Unfair dismissal claims', 'CMA & labour court proceedings', 'Employment contracts', 'Workplace discrimination', 'Redundancy & retrenchment', 'Trade union matters', 'Employment policy drafting'],
+  },
+  {
+    icon: Shield, title: 'Criminal Defense',
+    desc: 'Vigorous defense representation for individuals facing criminal charges, bail applications, appeals, and all matters before the criminal division of the courts.',
+    color: 'bg-red-50 text-red-600', panelColor: 'from-red-600 to-red-800',
+    services: ['Bail applications', 'Criminal trial defense', 'Appeals & revisions', 'White collar crime defense', 'Traffic & road offense defense', 'Plea bargaining', 'Sentence mitigation'],
+  },
+  {
+    icon: FileText, title: 'Notary Public & Oaths',
+    desc: 'Official notarization, certification of documents, affidavits, statutory declarations, and commissioner for oaths services for local and international use.',
+    color: 'bg-yellow-50 text-yellow-600', panelColor: 'from-yellow-500 to-amber-700',
+    services: ['Document notarization', 'Affidavits & sworn statements', 'Statutory declarations', 'Power of attorney', 'International document certification', 'Commissioner for oaths', 'Apostille services'],
+  },
 ];
 
 const testimonials = [
@@ -32,6 +67,7 @@ const features = [
 const LandingPage: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [formData, setFormData] = useState({ name: '', email: '', phone: '', message: '' });
+  const [selectedArea, setSelectedArea] = useState<typeof practiceAreas[0] | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -149,21 +185,90 @@ const LandingPage: React.FC = () => {
           <div className="text-center mb-12">
             <p className="text-accent-600 font-semibold text-sm uppercase tracking-widest mb-2">What We Do</p>
             <h2 className="text-4xl font-bold text-gray-900 mb-4">Our Practice Areas</h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">We provide comprehensive legal services across multiple disciplines, ensuring expert representation for all your legal needs.</p>
+            <p className="text-gray-600 max-w-2xl mx-auto">We provide comprehensive legal services across multiple disciplines. <span className="text-accent-600 font-medium">Click any area</span> to learn more.</p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {practiceAreas.map((area) => (
-              <div key={area.title} className="bg-white rounded-2xl p-6 shadow-card hover:shadow-card-hover hover:-translate-y-1 transition-all duration-300 border border-gray-100 group">
-                <div className={`w-12 h-12 rounded-xl ${area.color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-                  <area.icon className="h-6 w-6" />
-                </div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">{area.title}</h3>
-                <p className="text-gray-600 text-sm leading-relaxed">{area.desc}</p>
-              </div>
-            ))}
+            {practiceAreas.map((area) => {
+              const isSelected = selectedArea?.title === area.title;
+              return (
+                <button
+                  key={area.title}
+                  onClick={() => setSelectedArea(isSelected ? null : area)}
+                  className={`text-left bg-white rounded-2xl p-6 shadow-card border transition-all duration-300 group w-full ${
+                    isSelected
+                      ? 'border-primary-400 ring-2 ring-primary-200 shadow-card-hover -translate-y-1'
+                      : 'border-gray-100 hover:shadow-card-hover hover:-translate-y-1 hover:border-gray-200'
+                  }`}
+                >
+                  <div className={`w-12 h-12 rounded-xl ${area.color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform ${isSelected ? 'scale-110' : ''}`}>
+                    <area.icon className="h-6 w-6" />
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">{area.title}</h3>
+                  <p className="text-gray-500 text-sm leading-relaxed line-clamp-2">{area.desc}</p>
+                  <p className={`mt-3 text-xs font-semibold flex items-center gap-1 transition-colors ${isSelected ? 'text-primary-600' : 'text-gray-400 group-hover:text-primary-500'}`}>
+                    {isSelected ? 'Close ×' : 'Learn more →'}
+                  </p>
+                </button>
+              );
+            })}
           </div>
         </div>
       </section>
+
+      {/* Practice Area Slide Panel */}
+      {/* Backdrop */}
+      <div
+        onClick={() => setSelectedArea(null)}
+        className={`fixed inset-0 bg-black/40 backdrop-blur-sm z-40 transition-opacity duration-300 ${selectedArea ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+      />
+      {/* Panel */}
+      <div
+        className={`fixed top-0 right-0 h-full w-full max-w-md z-50 transition-transform duration-400 ease-in-out ${selectedArea ? 'translate-x-0' : 'translate-x-full'}`}
+        style={{ transitionDuration: '350ms' }}
+      >
+        {selectedArea && (
+          <div className="h-full flex flex-col bg-white shadow-2xl overflow-y-auto">
+            {/* Panel header gradient */}
+            <div className={`bg-gradient-to-br ${selectedArea.panelColor} p-8 pt-12 text-white relative`}>
+              <button
+                onClick={() => setSelectedArea(null)}
+                className="absolute top-4 right-4 w-9 h-9 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center transition-colors"
+              >
+                <X className="h-5 w-5 text-white" />
+              </button>
+              <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mb-5">
+                <selectedArea.icon className="h-8 w-8 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold mb-3">{selectedArea.title}</h2>
+              <p className="text-white/85 text-sm leading-relaxed">{selectedArea.desc}</p>
+            </div>
+            {/* Panel body */}
+            <div className="flex-1 p-8">
+              <h3 className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-4">Key Services</h3>
+              <ul className="space-y-3">
+                {selectedArea.services.map((svc) => (
+                  <li key={svc} className="flex items-start gap-3">
+                    <div className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${selectedArea.color}`}>
+                      <CheckCircle className="h-3.5 w-3.5" />
+                    </div>
+                    <span className="text-gray-700 text-sm">{svc}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-8 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                <p className="text-sm text-gray-600 mb-3">Interested in this service? Get in touch with our team today.</p>
+                <a
+                  href="#contact"
+                  onClick={() => setSelectedArea(null)}
+                  className="block w-full bg-primary-600 hover:bg-primary-700 text-white text-center py-2.5 rounded-lg text-sm font-semibold transition-colors"
+                >
+                  Book a Consultation →
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* About */}
       <section id="about" className="py-20 bg-white">
