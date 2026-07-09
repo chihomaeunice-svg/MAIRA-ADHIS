@@ -14,7 +14,7 @@ import { useUIStore } from '@/stores/uiStore';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
 
-const STATUSES: CaseStatus[] = ['NEW', 'ONGOING', 'COMPLETED', 'ARCHIVED'];
+const STATUSES: CaseStatus[] = ['DRAFT', 'NEW', 'ONGOING', 'COMPLETED', 'ARCHIVED'];
 
 const CaseDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
