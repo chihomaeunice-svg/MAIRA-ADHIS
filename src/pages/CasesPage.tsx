@@ -124,7 +124,7 @@ const CasesPage: React.FC = () => {
     getDocs(collection(db, 'users')).then(snap => {
       const staff = snap.docs
         .map(d => ({ id: d.id, name: d.data().name as string, role: d.data().role as string }))
-        .filter(u => ['ADVOCATE', 'ADMIN', 'MANAGING_PARTNER'].includes(u.role))
+        .filter(u => ['ADVOCATE', 'ADMIN', 'MANAGING_PARTNER', 'SECRETARY'].includes(u.role))
         .sort((a, b) => a.name.localeCompare(b.name));
       setAdvocates(staff);
     }).catch(() => {});
@@ -262,6 +262,7 @@ const CasesPage: React.FC = () => {
     if (!form.title.trim()) { toast.error('Case title is required'); return; }
     if (!form.plaintiffs.some(s => s.trim())) { toast.error('At least one plaintiff is required'); return; }
     if (!form.defendants.some(s => s.trim())) { toast.error('At least one defendant is required'); return; }
+    if (!form.selectedAdvocateIds.some(s => s)) { toast.error('At least one advocate is required'); return; }
     setSaving(true);
     try {
       await addDoc(collection(db, 'cases'), buildCasePayload(form.status));
