@@ -28,7 +28,7 @@ const CaseDetailPage: React.FC = () => {
 
   // Edit case state
   const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState({ title: '', description: '', status: '' as CaseStatus, judgment: '' });
+  const [editForm, setEditForm] = useState({ title: '', description: '', status: '' as CaseStatus, judgment: '', opposingCounsel: '', judgeName: '' });
 
   // Add note state
   const [noteText, setNoteText] = useState('');
@@ -63,7 +63,7 @@ const CaseDetailPage: React.FC = () => {
 
   const startEdit = () => {
     if (!caseData) return;
-    setEditForm({ title: caseData.title, description: caseData.description, status: caseData.status, judgment: caseData.judgment || '' });
+    setEditForm({ title: caseData.title, description: caseData.description, status: caseData.status, judgment: caseData.judgment || '', opposingCounsel: caseData.opposingCounsel || '', judgeName: caseData.judgeName || '' });
     setEditing(true);
   };
 
@@ -71,8 +71,17 @@ const CaseDetailPage: React.FC = () => {
     if (!caseData) return;
     setSavingEdit(true);
     try {
-      await updateDoc(doc(db, 'cases', caseData.id), { ...editForm, updatedAt: Timestamp.now() });
-      setCaseData({ ...caseData, ...editForm });
+      const updateData = {
+        title: editForm.title,
+        description: editForm.description,
+        status: editForm.status,
+        judgment: editForm.judgment || null,
+        opposingCounsel: editForm.opposingCounsel || null,
+        judgeName: editForm.judgeName || null,
+        updatedAt: Timestamp.now(),
+      };
+      await updateDoc(doc(db, 'cases', caseData.id), updateData);
+      setCaseData({ ...caseData, title: editForm.title, description: editForm.description, status: editForm.status, judgment: editForm.judgment || undefined, opposingCounsel: editForm.opposingCounsel || undefined, judgeName: editForm.judgeName || undefined, updatedAt: new Date() });
       setEditing(false);
       toast.success('Case updated successfully');
     } catch { toast.error('Failed to save changes'); }
@@ -212,6 +221,18 @@ const CaseDetailPage: React.FC = () => {
             </div>
             <textarea value={editForm.description} onChange={e => setEditForm({...editForm, description: e.target.value})} rows={3}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Case description" />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Opposing Counsel</label>
+                <input value={editForm.opposingCounsel} onChange={e => setEditForm({...editForm, opposingCounsel: e.target.value})}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Opposing counsel name (optional)" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Judge / Magistrate</label>
+                <input value={editForm.judgeName} onChange={e => setEditForm({...editForm, judgeName: e.target.value})}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Judge or magistrate name (optional)" />
+              </div>
+            </div>
           </div>
         ) : (
           <>
