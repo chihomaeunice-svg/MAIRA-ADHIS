@@ -111,6 +111,10 @@ export function useAuth() {
         await signOut(auth);
         throw new Error('Your account has been deactivated. Contact your administrator.');
       }
+      await updateDoc(doc(db, 'users', userCredential.user.uid), {
+        isCurrentlyActive: true,
+        currentSessionStart: serverTimestamp(),
+      });
       return profile;
     } catch (firebaseErr: unknown) {
       const code = (firebaseErr as { code?: string })?.code;
@@ -122,6 +126,10 @@ export function useAuth() {
           try {
             const newCred = await createUserWithEmailAndPassword(auth, normalizedEmail, password);
             const profile = await fetchUserProfile(newCred.user);
+            await updateDoc(doc(db, 'users', newCred.user.uid), {
+              isCurrentlyActive: true,
+              currentSessionStart: serverTimestamp(),
+            });
             toast.success(`Welcome, ${local.name}!`);
             return profile;
           } catch (createErr: unknown) {
@@ -139,6 +147,10 @@ export function useAuth() {
 
   const logout = async () => {
     try {
+      const uid = auth.currentUser?.uid;
+      if (uid) {
+        await updateDoc(doc(db, 'users', uid), { isCurrentlyActive: false, currentSessionStart: null, lastLogoutAt: serverTimestamp() });
+      }
       await signOut(auth);
     } catch { /* ignore */ }
     storeLogout();

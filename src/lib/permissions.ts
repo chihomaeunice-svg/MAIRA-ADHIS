@@ -7,9 +7,9 @@ export interface RoutePermission {
 }
 
 export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
-  ADMIN: ['dashboard', 'cases', 'clients', 'documents', 'correspondence', 'procurement', 'employees', 'calendar', 'reports', 'settings', 'users'],
-  MANAGING_PARTNER: ['dashboard', 'cases', 'clients', 'documents', 'correspondence', 'employees', 'calendar', 'reports', 'settings'],
-  ADVOCATE: ['dashboard', 'cases', 'clients', 'documents', 'calendar', 'settings'],
+  ADMIN: ['dashboard', 'cases', 'clients', 'corporate-works', 'documents', 'correspondence', 'procurement', 'employees', 'calendar', 'reports', 'settings', 'users', 'user-activity'],
+  MANAGING_PARTNER: ['dashboard', 'cases', 'clients', 'corporate-works', 'documents', 'correspondence', 'employees', 'calendar', 'reports', 'settings', 'user-activity'],
+  ADVOCATE: ['dashboard', 'cases', 'clients', 'corporate-works', 'documents', 'calendar', 'settings'],
   SECRETARY: ['dashboard', 'cases', 'clients', 'correspondence', 'documents', 'calendar', 'settings'],
   ACCOUNTANT: ['dashboard', 'procurement', 'reports', 'settings'],
   PROCUREMENT_OFFICER: ['dashboard', 'procurement', 'settings'],

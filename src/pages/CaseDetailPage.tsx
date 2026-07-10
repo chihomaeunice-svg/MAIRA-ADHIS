@@ -5,16 +5,19 @@ import {
   Clock, MapPin, CheckCircle2, AlertCircle, Plus, Edit2,
   Save, X, Printer, Upload, ChevronDown,
 } from 'lucide-react';
-import { collection, query, where, getDocs, doc, getDoc, updateDoc, arrayUnion, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, getDoc, updateDoc, arrayUnion, Timestamp } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { Case, CaseStatus, HearingDate, Note } from '@/types';
 import { formatDate, getStatusColor } from '@/lib/utils';
+import { COURT_NAMES, CASE_CATEGORIES } from '@/lib/caseConstants';
 import { useAuthStore } from '@/stores/authStore';
 import { useUIStore } from '@/stores/uiStore';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
 
 const STATUSES: CaseStatus[] = ['DRAFT', 'NEW', 'ONGOING', 'COMPLETED', 'ARCHIVED'];
+
+interface StaffOption { id: string; name: string; }
 
 const CaseDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -25,10 +28,17 @@ const CaseDetailPage: React.FC = () => {
   const [caseData, setCaseData] = useState<Case | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'hearings' | 'notes' | 'documents'>('overview');
+  const [advocates, setAdvocates] = useState<StaffOption[]>([]);
 
   // Edit case state
   const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState({ title: '', description: '', status: '' as CaseStatus, judgment: '', opposingCounsel: '', judgeName: '' });
+  const [editForm, setEditForm] = useState({
+    caseNumber: '', title: '', courtName: COURT_NAMES[0], category: CASE_CATEGORIES[0], filingDate: '',
+    plaintiffs: [''] as string[], defendants: [''] as string[],
+    description: '', status: '' as CaseStatus, judgment: '', judgeName: '',
+    opposingCounsel: '', opposingCounselPhone: '', opposingCounselEmail: '', opposingCounselAddress: '',
+    selectedAdvocateIds: [''] as string[], selectedAdvocateNames: [''] as string[],
+  });
 
   // Add note state
   const [noteText, setNoteText] = useState('');
@@ -44,6 +54,16 @@ const CaseDetailPage: React.FC = () => {
   useEffect(() => {
     loadCase();
   }, [id]);
+
+  useEffect(() => {
+    getDocs(collection(db, 'users')).then(snap => {
+      const staff = snap.docs
+        .map(d => ({ id: d.id, name: d.data().name as string, role: d.data().role as string }))
+        .filter(u => ['ADVOCATE', 'ADMIN', 'MANAGING_PARTNER', 'SECRETARY'].includes(u.role))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      setAdvocates(staff);
+    }).catch(() => {});
+  }, []);
 
   const loadCase = async () => {
     setLoading(true);
@@ -63,25 +83,112 @@ const CaseDetailPage: React.FC = () => {
 
   const startEdit = () => {
     if (!caseData) return;
-    setEditForm({ title: caseData.title, description: caseData.description, status: caseData.status, judgment: caseData.judgment || '', opposingCounsel: caseData.opposingCounsel || '', judgeName: caseData.judgeName || '' });
+    const advocateIds = caseData.advocateIds?.length ? caseData.advocateIds : (caseData.advocateId ? [caseData.advocateId] : ['']);
+    const advocateNames = caseData.advocateNames?.length ? caseData.advocateNames : (caseData.advocateName ? [caseData.advocateName] : ['']);
+    setEditForm({
+      caseNumber: caseData.caseNumber,
+      title: caseData.title,
+      courtName: caseData.courtName || COURT_NAMES[0],
+      category: caseData.category || CASE_CATEGORIES[0],
+      filingDate: new Date(caseData.filingDate).toISOString().split('T')[0],
+      plaintiffs: caseData.partiesNames.plaintiff ? caseData.partiesNames.plaintiff.split(' & ') : [''],
+      defendants: caseData.partiesNames.defendant ? caseData.partiesNames.defendant.split(' & ') : [''],
+      description: caseData.description,
+      status: caseData.status,
+      judgment: caseData.judgment || '',
+      judgeName: caseData.judgeName || '',
+      opposingCounsel: caseData.opposingCounsel || '',
+      opposingCounselPhone: caseData.opposingCounselPhone || '',
+      opposingCounselEmail: caseData.opposingCounselEmail || '',
+      opposingCounselAddress: caseData.opposingCounselAddress || '',
+      selectedAdvocateIds: advocateIds,
+      selectedAdvocateNames: advocateNames,
+    });
     setEditing(true);
   };
 
+  const updateEditAdvocate = (index: number, id: string) => {
+    const adv = advocates.find(a => a.id === id);
+    setEditForm(p => {
+      const ids = [...p.selectedAdvocateIds];
+      const names = [...p.selectedAdvocateNames];
+      ids[index] = id;
+      names[index] = adv?.name || '';
+      return { ...p, selectedAdvocateIds: ids, selectedAdvocateNames: names };
+    });
+  };
+
+  const updateEditParty = (type: 'plaintiffs' | 'defendants', index: number, value: string) => {
+    setEditForm(p => {
+      const arr = [...p[type]];
+      arr[index] = value;
+      return { ...p, [type]: arr };
+    });
+  };
+
+  const addEditParty = (type: 'plaintiffs' | 'defendants') =>
+    setEditForm(p => ({ ...p, [type]: [...p[type], ''] }));
+
+  const removeEditParty = (type: 'plaintiffs' | 'defendants', index: number) =>
+    setEditForm(p => ({ ...p, [type]: p[type].filter((_, i) => i !== index) }));
+
   const saveEdit = async () => {
     if (!caseData) return;
+    if (!editForm.title.trim()) { toast.error('Case title is required'); return; }
+    if (!editForm.plaintiffs.some(s => s.trim())) { toast.error('At least one plaintiff is required'); return; }
+    if (!editForm.defendants.some(s => s.trim())) { toast.error('At least one defendant is required'); return; }
     setSavingEdit(true);
     try {
+      const advocateIds = editForm.selectedAdvocateIds.filter(Boolean);
+      const advocateNames = editForm.selectedAdvocateNames.filter(Boolean);
+      const primaryAdvocateId = advocateIds[0] || caseData.advocateId;
+      const joinedAdvocateName = advocateNames.join(' & ') || caseData.advocateName;
+      const joinedPlaintiff = editForm.plaintiffs.filter(s => s.trim()).join(' & ');
+      const joinedDefendant = editForm.defendants.filter(s => s.trim()).join(' & ');
       const updateData = {
+        caseNumber: editForm.caseNumber,
         title: editForm.title,
+        courtName: editForm.courtName,
+        category: editForm.category,
+        filingDate: Timestamp.fromDate(new Date(editForm.filingDate)),
+        partiesNames: { plaintiff: joinedPlaintiff, defendant: joinedDefendant },
         description: editForm.description,
         status: editForm.status,
         judgment: editForm.judgment || null,
-        opposingCounsel: editForm.opposingCounsel || null,
         judgeName: editForm.judgeName || null,
+        opposingCounsel: editForm.opposingCounsel || null,
+        opposingCounselPhone: editForm.opposingCounselPhone || null,
+        opposingCounselEmail: editForm.opposingCounselEmail || null,
+        opposingCounselAddress: editForm.opposingCounselAddress || null,
+        advocateId: primaryAdvocateId,
+        advocateName: joinedAdvocateName,
+        advocateIds,
+        advocateNames,
         updatedAt: Timestamp.now(),
       };
       await updateDoc(doc(db, 'cases', caseData.id), updateData);
-      setCaseData({ ...caseData, title: editForm.title, description: editForm.description, status: editForm.status, judgment: editForm.judgment || undefined, opposingCounsel: editForm.opposingCounsel || undefined, judgeName: editForm.judgeName || undefined, updatedAt: new Date() });
+      setCaseData({
+        ...caseData,
+        caseNumber: editForm.caseNumber,
+        title: editForm.title,
+        courtName: editForm.courtName,
+        category: editForm.category,
+        filingDate: new Date(editForm.filingDate),
+        partiesNames: { plaintiff: joinedPlaintiff, defendant: joinedDefendant },
+        description: editForm.description,
+        status: editForm.status,
+        judgment: editForm.judgment || undefined,
+        judgeName: editForm.judgeName || undefined,
+        opposingCounsel: editForm.opposingCounsel || undefined,
+        opposingCounselPhone: editForm.opposingCounselPhone || undefined,
+        opposingCounselEmail: editForm.opposingCounselEmail || undefined,
+        opposingCounselAddress: editForm.opposingCounselAddress || undefined,
+        advocateId: primaryAdvocateId,
+        advocateName: joinedAdvocateName,
+        advocateIds,
+        advocateNames,
+        updatedAt: new Date(),
+      });
       setEditing(false);
       toast.success('Case updated successfully');
     } catch { toast.error('Failed to save changes'); }
@@ -111,6 +218,19 @@ const CaseDetailPage: React.FC = () => {
       setHearingForm({ date: '', venue: '', purpose: '', outcome: '' });
       setShowHearingForm(false);
       toast.success('Hearing date added');
+      try {
+        await addDoc(collection(db, 'calendarEvents'), {
+          title: `${caseData.title} — ${hearing.purpose}`,
+          date: hearing.date.toISOString().split('T')[0],
+          type: 'HEARING',
+          location: hearing.venue,
+          relatedCaseId: caseData.id,
+          notes: hearing.outcome || null,
+          addedBy: user?.id || 'unknown',
+          addedByName: user?.name || 'Unknown',
+          createdAt: Timestamp.now(),
+        });
+      } catch { /* calendar sync is best-effort */ }
     } catch { toast.error('Failed to add hearing'); }
     setSavingHearing(false);
   };
@@ -203,8 +323,78 @@ const CaseDetailPage: React.FC = () => {
       <div className="bg-white rounded-xl border border-gray-200 shadow-card p-6">
         {editing ? (
           <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Case Number</label>
+                <input value={editForm.caseNumber} onChange={e => setEditForm({...editForm, caseNumber: e.target.value})}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Filing Date</label>
+                <input type="date" value={editForm.filingDate} onChange={e => setEditForm({...editForm, filingDate: e.target.value})}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              </div>
+            </div>
             <input value={editForm.title} onChange={e => setEditForm({...editForm, title: e.target.value})}
               className="w-full text-xl font-bold border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Case Title" />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Court Name</label>
+                <select value={editForm.courtName} onChange={e => setEditForm({...editForm, courtName: e.target.value})}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
+                  {COURT_NAMES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Case Category</label>
+                <select value={editForm.category} onChange={e => setEditForm({...editForm, category: e.target.value})}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
+                  {CASE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-medium text-gray-600 block">Plaintiff(s)</label>
+                <button type="button" onClick={() => addEditParty('plaintiffs')} className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 font-medium">
+                  <Plus className="h-3 w-3" /> Add plaintiff
+                </button>
+              </div>
+              <div className="space-y-2">
+                {editForm.plaintiffs.map((pl, i) => (
+                  <div key={i} className="flex gap-2">
+                    <input value={pl} onChange={e => updateEditParty('plaintiffs', i, e.target.value)} placeholder={`Plaintiff ${i + 1}`}
+                      className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                    {editForm.plaintiffs.length > 1 && (
+                      <button type="button" onClick={() => removeEditParty('plaintiffs', i)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-medium text-gray-600 block">Defendant(s)</label>
+                <button type="button" onClick={() => addEditParty('defendants')} className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 font-medium">
+                  <Plus className="h-3 w-3" /> Add defendant
+                </button>
+              </div>
+              <div className="space-y-2">
+                {editForm.defendants.map((def, i) => (
+                  <div key={i} className="flex gap-2">
+                    <input value={def} onChange={e => updateEditParty('defendants', i, e.target.value)} placeholder={`Defendant ${i + 1}`}
+                      className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                    {editForm.defendants.length > 1 && (
+                      <button type="button" onClick={() => removeEditParty('defendants', i)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">Status</label>
@@ -233,6 +423,59 @@ const CaseDetailPage: React.FC = () => {
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Judge or magistrate name (optional)" />
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Opposing Counsel Phone</label>
+                <input value={editForm.opposingCounselPhone} onChange={e => setEditForm({...editForm, opposingCounselPhone: e.target.value})}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Phone (optional)" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Opposing Counsel Email</label>
+                <input value={editForm.opposingCounselEmail} onChange={e => setEditForm({...editForm, opposingCounselEmail: e.target.value})}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Email (optional)" />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Opposing Counsel Address</label>
+              <input value={editForm.opposingCounselAddress} onChange={e => setEditForm({...editForm, opposingCounselAddress: e.target.value})}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Address (optional)" />
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-medium text-gray-600 block">Advocate(s) Handling</label>
+                {editForm.selectedAdvocateIds.length < 2 && (
+                  <button type="button" onClick={() => setEditForm(p => ({
+                      ...p,
+                      selectedAdvocateIds: [...p.selectedAdvocateIds, ''],
+                      selectedAdvocateNames: [...p.selectedAdvocateNames, ''],
+                    }))}
+                    className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 font-medium">
+                    <Plus className="h-3 w-3" /> Add 2nd advocate
+                  </button>
+                )}
+              </div>
+              <div className="space-y-2">
+                {editForm.selectedAdvocateIds.map((advId, i) => (
+                  <div key={i} className="flex gap-2">
+                    <select value={advId} onChange={e => updateEditAdvocate(i, e.target.value)}
+                      className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                      <option value="">— Select advocate —</option>
+                      {advocates.map(adv => <option key={adv.id} value={adv.id}>{adv.name}</option>)}
+                    </select>
+                    {editForm.selectedAdvocateIds.length > 1 && (
+                      <button type="button" onClick={() => setEditForm(p => ({
+                          ...p,
+                          selectedAdvocateIds: p.selectedAdvocateIds.filter((_, j) => j !== i),
+                          selectedAdvocateNames: p.selectedAdvocateNames.filter((_, j) => j !== i),
+                        }))}
+                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         ) : (
           <>
@@ -256,6 +499,8 @@ const CaseDetailPage: React.FC = () => {
                 { label: 'Category', value: caseData.category },
                 { label: 'Filed Date', value: formatDate(caseData.filingDate) },
                 ...(caseData.opposingCounsel ? [{ label: 'Opposing Counsel', value: caseData.opposingCounsel }] : []),
+                ...(caseData.opposingCounselPhone ? [{ label: 'Opposing Counsel Phone', value: caseData.opposingCounselPhone }] : []),
+                ...(caseData.opposingCounselEmail ? [{ label: 'Opposing Counsel Email', value: caseData.opposingCounselEmail }] : []),
                 ...(caseData.judgeName ? [{ label: 'Presiding Judge / Magistrate', value: caseData.judgeName }] : []),
               ].map(item => (
                 <div key={item.label}>

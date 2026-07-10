@@ -17,6 +17,7 @@ import CasesPage from '@/pages/CasesPage';
 import CaseDetailPage from '@/pages/CaseDetailPage';
 import ClientsPage from '@/pages/ClientsPage';
 import ClientDetailPage from '@/pages/ClientDetailPage';
+import CorporateWorks from '@/pages/CorporateWorks';
 import DocumentsPage from '@/pages/DocumentsPage';
 import CorrespondencePage from '@/pages/CorrespondencePage';
 import ProcurementPage from '@/pages/ProcurementPage';
@@ -25,6 +26,7 @@ import CalendarPage from '@/pages/CalendarPage';
 import ReportsPage from '@/pages/ReportsPage';
 import SettingsPage from '@/pages/SettingsPage';
 import UserManagementPage from '@/pages/dashboard/UserManagementPage';
+import UserActivityPage from '@/pages/UserActivityPage';
 import NotFoundPage from '@/pages/NotFoundPage';
 
 function AppInitializer({ children }: { children: React.ReactNode }) {
@@ -89,6 +91,7 @@ function AppRoutes() {
       <Route path="/cases/:id" element={<ProtectedRoute page="cases"><DashboardLayout><CaseDetailPage /></DashboardLayout></ProtectedRoute>} />
       <Route path="/clients" element={<ProtectedRoute page="clients"><DashboardLayout><ClientsPage /></DashboardLayout></ProtectedRoute>} />
       <Route path="/clients/:id" element={<ProtectedRoute page="clients"><DashboardLayout><ClientDetailPage /></DashboardLayout></ProtectedRoute>} />
+      <Route path="/corporate-works" element={<ProtectedRoute page="corporate-works"><DashboardLayout><CorporateWorks /></DashboardLayout></ProtectedRoute>} />
       <Route path="/documents" element={<ProtectedRoute page="documents"><DashboardLayout><DocumentsPage /></DashboardLayout></ProtectedRoute>} />
       <Route path="/correspondence" element={<ProtectedRoute page="correspondence"><DashboardLayout><CorrespondencePage /></DashboardLayout></ProtectedRoute>} />
       <Route path="/procurement" element={<ProtectedRoute page="procurement"><DashboardLayout><ProcurementPage /></DashboardLayout></ProtectedRoute>} />
@@ -98,6 +101,7 @@ function AppRoutes() {
       <Route path="/reports" element={<ProtectedRoute page="reports"><DashboardLayout><ReportsPage /></DashboardLayout></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute page="settings"><DashboardLayout><SettingsPage /></DashboardLayout></ProtectedRoute>} />
       <Route path="/users" element={<ProtectedRoute page="users"><DashboardLayout><UserManagementPage /></DashboardLayout></ProtectedRoute>} />
+      <Route path="/user-activity" element={<ProtectedRoute page="user-activity"><DashboardLayout><UserActivityPage /></DashboardLayout></ProtectedRoute>} />
 
       <Route path="*" element={<NotFoundPage />} />
     </Routes>

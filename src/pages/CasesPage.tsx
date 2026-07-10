@@ -7,6 +7,7 @@ import {
 import { db } from '@/firebase';
 import { Case, CaseStatus } from '@/types';
 import { formatDate, getStatusColor } from '@/lib/utils';
+import { COURT_NAMES, CASE_CATEGORIES } from '@/lib/caseConstants';
 import { useUIStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
 import { clsx } from 'clsx';
@@ -21,39 +22,7 @@ const STATUSES: { value: CaseStatus | 'ALL'; label: string }[] = [
   { value: 'ARCHIVED', label: 'Archived' },
 ];
 
-const CATEGORIES = [
-  'All Categories',
-  'Civil Litigation',
-  'Commercial & Corporate',
-  'Criminal Defense',
-  'Labour Law',
-  'Family Matters',
-  'Conveyances & Property',
-  'Notary Public',
-  'Other',
-];
-
-const COURT_NAMES = [
-  'High Court of Tanzania',
-  'Resident Magistrate Court - Kinondoni',
-  'Resident Magistrate Court - Ilala',
-  'Labour Court of Tanzania',
-  'Court of Appeal',
-  'District Court',
-  'Land Division - High Court',
-  'Other',
-];
-
-const CASE_CATEGORIES = [
-  'Civil Litigation',
-  'Commercial & Corporate',
-  'Criminal Defense',
-  'Labour Law',
-  'Family Matters',
-  'Conveyances & Property',
-  'Notary Public',
-  'Other',
-];
+const CATEGORIES = ['All Categories', ...CASE_CATEGORIES];
 
 function generateCaseNumber(): string {
   const year = new Date().getFullYear();
@@ -257,6 +226,23 @@ const CasesPage: React.FC = () => {
     };
   };
 
+  const syncFirstHearingToCalendar = async (caseId: string) => {
+    if (!form.firstHearingDate) return;
+    try {
+      await addDoc(collection(db, 'calendarEvents'), {
+        title: `${form.title.trim()} — First Hearing`,
+        date: form.firstHearingDate,
+        type: 'HEARING',
+        location: form.courtName,
+        relatedCaseId: caseId,
+        notes: null,
+        addedBy: user?.id || 'unknown',
+        addedByName: user?.name || 'Unknown',
+        createdAt: Timestamp.now(),
+      });
+    } catch { /* calendar sync is best-effort */ }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title.trim()) { toast.error('Case title is required'); return; }
@@ -265,7 +251,8 @@ const CasesPage: React.FC = () => {
     if (!form.selectedAdvocateIds.some(s => s)) { toast.error('At least one advocate is required'); return; }
     setSaving(true);
     try {
-      await addDoc(collection(db, 'cases'), buildCasePayload(form.status));
+      const docRef = await addDoc(collection(db, 'cases'), buildCasePayload(form.status));
+      await syncFirstHearingToCalendar(docRef.id);
       toast.success('Case added successfully');
       setShowNewCase(false);
       setForm(defaultForm());
@@ -282,7 +269,8 @@ const CasesPage: React.FC = () => {
     if (!form.title.trim()) { toast.error('A case title is required to save as draft'); return; }
     setSaving(true);
     try {
-      await addDoc(collection(db, 'cases'), buildCasePayload('DRAFT'));
+      const docRef = await addDoc(collection(db, 'cases'), buildCasePayload('DRAFT'));
+      await syncFirstHearingToCalendar(docRef.id);
       toast.success('Case saved as draft');
       setShowNewCase(false);
       setForm(defaultForm());
