@@ -3,9 +3,11 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   X, Scale, LayoutDashboard, Briefcase, Users, FileText, Mail,
   ShoppingCart, UserCog, Calendar, BarChart3, Settings, LogOut, UserCog2,
+  Building2, Activity,
 } from 'lucide-react';
 import { useUIStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
+import { useAuth } from '@/hooks/useAuth';
 import { canAccess } from '@/lib/permissions';
 import { UserRole } from '@/types';
 import { clsx } from 'clsx';
@@ -21,6 +23,7 @@ const allNavItems: NavItem[] = [
   { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, permission: 'dashboard' },
   { label: 'Cases', path: '/cases', icon: Briefcase, permission: 'cases' },
   { label: 'Clients', path: '/clients', icon: Users, permission: 'clients' },
+  { label: 'Corporate Works', path: '/corporate-works', icon: Building2, permission: 'corporate-works' },
   { label: 'Documents', path: '/documents', icon: FileText, permission: 'documents' },
   { label: 'Correspondence', path: '/correspondence', icon: Mail, permission: 'correspondence' },
   { label: 'Procurement', path: '/procurement', icon: ShoppingCart, permission: 'procurement' },
@@ -29,11 +32,13 @@ const allNavItems: NavItem[] = [
   { label: 'Reports', path: '/reports', icon: BarChart3, permission: 'reports' },
   { label: 'Settings', path: '/settings', icon: Settings, permission: 'settings' },
   { label: 'User Management', path: '/users', icon: UserCog2, permission: 'users' },
+  { label: 'User Activity', path: '/user-activity', icon: Activity, permission: 'user-activity' },
 ];
 
 const MobileSidebar: React.FC = () => {
   const { mobileSidebarOpen, setMobileSidebarOpen } = useUIStore();
-  const { user, logout } = useAuthStore();
+  const { user } = useAuthStore();
+  const { logout } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = async () => {

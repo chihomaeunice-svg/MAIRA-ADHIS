@@ -12,6 +12,9 @@ export interface FirestoreUser {
   createdAt: Date;
   updatedAt: Date;
   lastLogin?: Date;
+  isCurrentlyActive?: boolean;
+  currentSessionStart?: Date | null;
+  lastLogoutAt?: Date | null;
 }
 
 export type CaseStatus = 'NEW' | 'ONGOING' | 'COMPLETED' | 'ARCHIVED' | 'DRAFT';
@@ -56,6 +59,8 @@ export interface Case {
   partiesNames: { plaintiff: string; defendant: string };
   advocateId: string;
   advocateName: string;
+  advocateIds?: string[];
+  advocateNames?: string[];
   clientId: string;
   clientName: string;
   filingDate: Date;
@@ -67,6 +72,9 @@ export interface Case {
   documents: DocumentRef[];
   judgment?: string;
   opposingCounsel?: string;
+  opposingCounselPhone?: string;
+  opposingCounselEmail?: string;
+  opposingCounselAddress?: string;
   judgeName?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -170,6 +178,38 @@ export interface CalendarEvent {
   participants?: string[];
   location?: string;
   notes?: string;
+}
+
+export type CorporateWorkStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
+
+export interface CorporateWorkItem {
+  id: string;
+  title: string;
+  workType: string;
+  status: CorporateWorkStatus;
+  assignedToId?: string;
+  assignedToName?: string;
+  dueDate?: Date;
+  notes?: string;
+  createdAt: Date;
+}
+
+export interface Company {
+  id: string;
+  name: string;
+  registrationNumber?: string;
+  industry?: string;
+  clientName: string;
+  contactPerson: string;
+  contactPhone: string;
+  contactEmail?: string;
+  address?: string;
+  retainerStatus: 'ACTIVE' | 'INACTIVE';
+  works: CorporateWorkItem[];
+  documents: DocumentRef[];
+  addedBy?: string;
+  addedByName?: string;
+  createdAt: Date;
 }
 
 export interface DashboardStats {

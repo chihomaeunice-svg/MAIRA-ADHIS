@@ -1,94 +1,69 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, updateDoc, doc, Timestamp } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/firebase';
-import { FirestoreUser } from '@/types';
-import { formatDate } from '@/lib/utils';
+import { FirestoreUser, UserRole } from '@/types';
+import { ROLE_LABELS, ROLE_COLORS } from '@/lib/permissions';
 import { useUIStore } from '@/stores/uiStore';
+import { Activity, RefreshCw, Users } from 'lucide-react';
 import { clsx } from 'clsx';
-import { Clock, LogIn, LogOut } from 'lucide-react';
+import toast from 'react-hot-toast';
+
+type Filter = 'all' | 'active' | 'inactive';
 
 const UserActivityPage: React.FC = () => {
   const { setPageTitle } = useUIStore();
   const [users, setUsers] = useState<FirestoreUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [filter, setFilter] = useState<Filter>('all');
 
-  useEffect(() => {
-    setPageTitle('User Activity & Status');
-    loadUsers();
-    const interval = setInterval(loadUsers, 30000); // Refresh every 30 seconds
-    return () => clearInterval(interval);
-  }, []);
+  useEffect(() => { setPageTitle('User Activity'); }, [setPageTitle]);
 
-  const loadUsers = async () => {
+  const fetchUsers = async () => {
+    setLoading(true);
     try {
       const snap = await getDocs(collection(db, 'users'));
       const data = snap.docs.map(d => {
         const raw = d.data();
         return {
-          ...raw,
           uid: d.id,
+          name: raw.name,
+          email: raw.email,
+          role: raw.role,
+          department: raw.department,
+          phone: raw.phone,
+          avatar: raw.avatar,
+          status: raw.status,
+          isCurrentlyActive: raw.isCurrentlyActive ?? false,
           createdAt: raw.createdAt?.toDate?.() ?? new Date(),
           updatedAt: raw.updatedAt?.toDate?.() ?? new Date(),
-          lastLogin: raw.lastLogin?.toDate?.() ?? new Date(),
+          lastLogin: raw.lastLogin?.toDate?.() ?? null,
           currentSessionStart: raw.currentSessionStart?.toDate?.() ?? null,
+          lastLogoutAt: raw.lastLogoutAt?.toDate?.() ?? null,
         } as FirestoreUser;
       });
       setUsers(data.sort((a, b) => {
         if (a.isCurrentlyActive && !b.isCurrentlyActive) return -1;
         if (!a.isCurrentlyActive && b.isCurrentlyActive) return 1;
-        return (b.lastLogin?.getTime() || 0) - (a.lastLogin?.getTime() || 0);
+        return a.name.localeCompare(b.name);
       }));
-    } catch (error) {
-      console.error('Error loading users:', error);
+    } catch {
+      toast.error('Failed to load user activity');
+      setUsers([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const getSessionDuration = (user: FirestoreUser): string => {
-    if (!user.isCurrentlyActive || !user.currentSessionStart) return '—';
+  useEffect(() => { fetchUsers(); }, []);
+
+  const sessionDuration = (u: FirestoreUser): string => {
+    if (!u.isCurrentlyActive || !u.currentSessionStart) return '—';
     const now = new Date();
-    const diff = now.getTime() - user.currentSessionStart.getTime();
-    const hours = Math.floor(diff / 3600000);
-    const minutes = Math.floor((diff % 3600000) / 60000);
-    if (hours > 0) return `${hours}h ${minutes}m`;
-    return `${minutes}m`;
-  };
-
-  const getLastActivityTime = (user: FirestoreUser): string => {
-    if (!user.lastLogin) return 'Never';
-    const now = new Date();
-    const diff = now.getTime() - user.lastLogin.getTime();
-    const days = Math.floor(diff / 86400000);
-    const hours = Math.floor((diff % 86400000) / 3600000);
-    const minutes = Math.floor((diff % 3600000) / 60000);
-
-    if (days > 0) return `${days}d ago`;
-    if (hours > 0) return `${hours}h ago`;
-    if (minutes > 0) return `${minutes}m ago`;
-    return 'Just now';
-  };
-
-  const roleColors: Record<string, string> = {
-    ADMIN: 'bg-red-50 border-red-200',
-    MANAGING_PARTNER: 'bg-purple-50 border-purple-200',
-    ADVOCATE: 'bg-blue-50 border-blue-200',
-    SECRETARY: 'bg-green-50 border-green-200',
-    ACCOUNTANT: 'bg-yellow-50 border-yellow-200',
-    PROCUREMENT_OFFICER: 'bg-indigo-50 border-indigo-200',
-    EMPLOYEE: 'bg-gray-50 border-gray-200',
-  };
-
-  const statusDotColor = (user: FirestoreUser): string => {
-    if (user.isCurrentlyActive) return 'bg-green-500';
-    const now = new Date();
-    const lastLogin = user.lastLogin || new Date();
-    const diff = now.getTime() - lastLogin.getTime();
-    const hoursAgo = diff / 3600000;
-    if (hoursAgo < 24) return 'bg-yellow-500';
-    if (hoursAgo < 168) return 'bg-orange-500';
-    return 'bg-gray-400';
+    const diff = now.getTime() - u.currentSessionStart.getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins}m`;
+    return `${Math.floor(mins / 60)}h ${mins % 60}m`;
   };
 
   const filteredUsers = users.filter(u => {
@@ -98,141 +73,119 @@ const UserActivityPage: React.FC = () => {
   });
 
   const activeCount = users.filter(u => u.isCurrentlyActive).length;
-  const totalUsers = users.length;
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <p className="text-xs text-gray-500 font-medium mb-1">Active Now</p>
-          <p className="text-2xl font-bold text-primary-600">{activeCount}</p>
-          <p className="text-xs text-gray-400 mt-2">of {totalUsers} users</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900">User Activity</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{activeCount} of {users.length} staff currently active</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <p className="text-xs text-gray-500 font-medium mb-1">Last 24 Hours</p>
-          <p className="text-2xl font-bold text-yellow-600">
-            {users.filter(u => {
-              const now = new Date();
-              const diff = (now.getTime() - (u.lastLogin?.getTime() || now.getTime())) / 3600000;
-              return diff < 24;
-            }).length}
-          </p>
-          <p className="text-xs text-gray-400 mt-2">recently active</p>
+        <button
+          onClick={fetchUsers}
+          className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+        >
+          <RefreshCw className="h-4 w-4 text-gray-500" />
+          Refresh
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="rounded-xl border border-gray-200 bg-white p-4 text-center">
+          <p className="text-xl font-bold text-gray-900">{users.length}</p>
+          <p className="text-xs text-gray-500 mt-0.5">Total Staff</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <p className="text-xs text-gray-500 font-medium mb-1">Inactive</p>
-          <p className="text-2xl font-bold text-gray-600">
-            {users.filter(u => {
-              const now = new Date();
-              const diff = (now.getTime() - (u.lastLogin?.getTime() || now.getTime())) / 3600000;
-              return diff >= 24;
-            }).length}
-          </p>
-          <p className="text-xs text-gray-400 mt-2">beyond 24 hours</p>
+        <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-center">
+          <p className="text-xl font-bold text-gray-900">{activeCount}</p>
+          <p className="text-xs text-gray-500 mt-0.5">Active Now</p>
+        </div>
+        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-center">
+          <p className="text-xl font-bold text-gray-900">{users.length - activeCount}</p>
+          <p className="text-xs text-gray-500 mt-0.5">Offline</p>
         </div>
       </div>
 
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-lg w-fit">
         {(['all', 'active', 'inactive'] as const).map(f => (
           <button
             key={f}
             onClick={() => setFilter(f)}
             className={clsx(
-              'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-              filter === f
-                ? 'bg-primary-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              'px-3 py-1.5 rounded-md text-sm font-medium transition-colors capitalize',
+              filter === f ? 'bg-white text-primary-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
             )}
           >
-            {f === 'all' ? 'All Users' : f === 'active' ? 'Currently Active' : 'Inactive'}
+            {f}
           </button>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 gap-3">
-        {filteredUsers.length === 0 ? (
-          <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-500">
-            No users found for this filter
-          </div>
-        ) : (
-          filteredUsers.map(user => (
-            <div
-              key={user.uid}
-              className={clsx(
-                'bg-white rounded-xl border-2 p-4 transition-all',
-                roleColors[user.role] || roleColors.EMPLOYEE
-              )}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-3 flex-1">
-                  <div className={clsx('w-3 h-3 rounded-full mt-1 flex-shrink-0', statusDotColor(user))} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-gray-900 truncate">{user.name}</h3>
-                      <span className="text-xs font-medium text-gray-500 bg-white/70 px-2 py-0.5 rounded">
-                        {user.role.replace(/_/g, ' ')}
-                      </span>
-                      {user.isCurrentlyActive && (
-                        <span className="text-xs font-bold text-green-600 bg-green-100/50 px-2 py-0.5 rounded animate-pulse">
-                          ONLINE
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-600 mb-2">{user.email}</p>
-
-                    <div className="grid grid-cols-2 gap-3 text-xs">
-                      <div>
-                        <p className="text-gray-500 mb-0.5 flex items-center gap-1">
-                          <LogIn className="h-3 w-3" /> Last Login
-                        </p>
-                        <p className="font-medium text-gray-900">
-                          {user.lastLogin ? getLastActivityTime(user) : 'Never'}
-                        </p>
-                        <p className="text-gray-500 text-xs">
-                          {user.lastLogin ? formatDate(user.lastLogin) : '—'}
-                        </p>
-                      </div>
-
-                      {user.isCurrentlyActive && user.currentSessionStart && (
-                        <div>
-                          <p className="text-gray-500 mb-0.5 flex items-center gap-1">
-                            <Clock className="h-3 w-3" /> Session Duration
-                          </p>
-                          <p className="font-medium text-green-600">{getSessionDuration(user)}</p>
-                          <p className="text-gray-500 text-xs">
-                            Since {user.currentSessionStart.toLocaleTimeString()}
-                          </p>
+      {loading ? (
+        <div className="bg-white rounded-xl border border-gray-200 py-16 flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
+          <p className="text-gray-500 text-sm">Loading user activity...</p>
+        </div>
+      ) : filteredUsers.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-200 py-16 text-center">
+          <Users className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-500 font-medium">No users found</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Staff</th>
+                <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Role</th>
+                <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Status</th>
+                <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Session</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filteredUsers.map(user => (
+                <tr key={user.uid} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-5 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 text-xs font-bold">
+                          {user.name.charAt(0).toUpperCase()}
                         </div>
-                      )}
+                        {user.isCurrentlyActive && (
+                          <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-white" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{user.name}</p>
+                        <p className="text-xs text-gray-500">{user.email}</p>
+                      </div>
                     </div>
-                  </div>
-                </div>
-
-                <div className="text-right ml-4 flex-shrink-0">
-                  <span
-                    className={clsx(
-                      'inline-block px-3 py-1 rounded-full text-xs font-semibold',
-                      user.isCurrentlyActive
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-gray-100 text-gray-600'
-                    )}
-                  >
-                    {user.isCurrentlyActive ? '🟢 Active' : '⚪ Offline'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
+                  </td>
+                  <td className="px-5 py-3">
+                    <span className={clsx('text-xs px-2 py-0.5 rounded-full font-medium', ROLE_COLORS[user.role as UserRole] || 'bg-gray-100 text-gray-600')}>
+                      {ROLE_LABELS[user.role as UserRole] || user.role}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3">
+                    <span className={clsx('text-xs font-medium flex items-center gap-1.5', user.isCurrentlyActive ? 'text-green-600' : 'text-gray-400')}>
+                      <Activity className="h-3.5 w-3.5" />
+                      {user.isCurrentlyActive ? 'Active' : 'Offline'}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3 text-sm text-gray-600">
+                    {user.isCurrentlyActive && user.currentSessionStart
+                      ? <>Since {user.currentSessionStart.toLocaleTimeString()} ({sessionDuration(user)})</>
+                      : user.lastLogoutAt
+                        ? <>Logged out {user.lastLogoutAt.toLocaleString()}</>
+                        : user.lastLogin
+                          ? <>Last seen {user.lastLogin.toLocaleString()}</>
+                          : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 };
